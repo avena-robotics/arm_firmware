@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<ProjectWorkspace xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="project_mpw.xsd">
+
+  <SchemaVersion>1.0</SchemaVersion>
+
+  <Header>### uVision Project, (C) Keil Software</Header>
+
+  <WorkspaceName>WorkSpace</WorkspaceName>
+
+  <project>
+    <PathAndName>.\universal_joint_3.2_MC5Y3_RI70\MDK-ARM\universal_joint_3.2_MC5Y3_RI70.uvprojx</PathAndName>
+  </project>
+
+  <project>
+    <PathAndName>.\universal_joint_3.2_MC5Y3_RI80\MDK-ARM\universal_joint_3.2_MC5Y3_RI80.uvprojx</PathAndName>
+  </project>
+
+  <project>
+    <PathAndName>.\gripper_pump\MDK-ARM\gripper_pump.uvprojx</PathAndName>
+    <NodeIsActive>1</NodeIsActive>
+    <NodeIsExpanded>1</NodeIsExpanded>
+  </project>
+
+  <project>
+    <PathAndName>..\..\Documents\jtc\AT_H745_JTC_1\AT_H7M4_JTC_1\AT_H7M4_JTC_1.uvprojx</PathAndName>
+  </project>
+
+  <project>
+    <PathAndName>..\..\Documents\jtc\AT_H745_JTC_1\AT_H7M7_JTC_1\AT_H7M7_JTC_1.uvprojx</PathAndName>
+  </project>
+
+</ProjectWorkspace>
