@@ -4,10 +4,10 @@
 		<define key="POLE_PAIR_NUM" value="7" />
 		<define key="RS" value="0.15" />
 		<define key="LS" value="0.000318" />
-		<define key="NOMINAL_CURRENT" value="16012" />
+		<define key="NOMINAL_CURRENT" value="18195" />
 		<define key="MOTOR_MAX_SPEED_RPM" value="2424" />
 		<define key="MOTOR_VOLTAGE_CONSTANT" value="14.7" />
-		<define key="ID_DEMAG" value="-16012" />
+		<define key="ID_DEMAG" value="-18195" />
 		<define key="HALL_SENSORS_PLACEMENT" value="DEGREES_120" />
 		<define key="HALL_PHASE_SHIFT" value="300" />
 		<define key="ENCODER_PPR" value="1792" />
@@ -15,7 +15,7 @@
 		<define key="ENCODER_AVAILABLE" value="TRUE" />
 		<define key="MOTOR_TYPE" value="PMSM" />
 		<define key="LDLQ_RATIO" value="1.000" />
-		<define key="DC_CURRENT_RS_MEAS" value="22.00" />
+		<define key="DC_CURRENT_RS_MEAS" value="25.00" />
 		<define key="PHASE_UH_POLARITY" value="H_ACTIVE_HIGH" />
 		<define key="PHASE_VH_POLARITY" value="H_ACTIVE_HIGH" />
 		<define key="PHASE_WH_POLARITY" value="H_ACTIVE_HIGH" />
@@ -202,7 +202,7 @@
 		<define key="CONSTANT1_Q" value="533790" />
 		<define key="CONSTANT1_D" value="533790" />
 		<define key="CONSTANT2_QD" value="76311" />
-		<define key="IQMAX" value="16012" />
+		<define key="IQMAX" value="18195" />
 		<define key="SEGDIV" value="0" />
 		<define key="ANGC" value="{0,0,0,0,0,0,0,0}" />
 		<define key="OFST" value="{0,0,0,0,0,0,0,0}" />
@@ -323,7 +323,7 @@
 		<define key="START_STOP_GPIO_PORT" value="GPIOB" />
 		<define key="START_STOP_GPIO_PIN" value="GPIO_Pin_10" />
 		<define key="BKIN_MODE" value="NONE" />
-		<define key="BKIN2_MODE" value="INT_MODE" />
+		<define key="BKIN2_MODE" value="NONE" />
 		<define key="ADC_1_PERIPH" value="ADC1" />
 		<define key="ADC_2_PERIPH" value="ADC2" />
 		<define key="ADC_PERIPH" value="ADC1" />
@@ -381,7 +381,7 @@
 		<define key="OPAMP_OUT_GPIO_PIN" value="GPIO_Pin_2" />
 		<define key="OPAMP_PGAGAIN" value="OPAMP_OPAMP_PGAGain_8" />
 		<define key="OPAMP_PGACONNECT" value="OPAMP1_PGAConnect_PA3" />
-		<define key="INTERNAL_OVERCURRENTPROTECTION" value="ENABLE" />
+		<define key="INTERNAL_OVERCURRENTPROTECTION" value="DISABLE" />
 		<define key="OCPREF" value="5957" />
 		<define key="INTERNAL_OVERVOLTAGEPROTECTION" value="DISABLE" />
 		<define key="OVPREF" value="23830" />
@@ -477,7 +477,7 @@
 		<define key="DAC_TIMER_CH1_GPIO_PIN" value="GPIO_Pin_0" />
 		<define key="DAC_TIMER_CH2_GPIO_PORT" value="GPIOA" />
 		<define key="DAC_TIMER_CH2_GPIO_PIN" value="GPIO_Pin_0" />
-		<define key="SW_OV_CURRENT_PROT_ENABLING" value="ENABLE" />
+		<define key="SW_OV_CURRENT_PROT_ENABLING" value="DISABLE" />
 		<define key="CTRBDID" value="10021" />
 		<define key="SHARED_SIGNAL_ENABLE" value="FALSE" />
 		<define key="DAC_EMULATED" value="FALSE" />

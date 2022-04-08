@@ -1480,59 +1480,56 @@ void FSM_Tick_Callback()
 
 bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition should block changing state to new one - add flag transition is running
 {
-
 	switch (new_state)
 	{
-//#if defined CALIBRATION
-//#else
-		case FSM_START:
-		{
-			break;
-		}
+//		case FSM_START:
+//		{
+//			break;
+//		}
 
-		case FSM_INIT:
-		{
-			if (FSM_Get_State() == FSM_START)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT);
-			}
+//		case FSM_INIT:
+//		{
+//			if (FSM_Get_State() == FSM_START)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT);
+//			}
 
-			if (FSM_Get_State() == FSM_FAULT)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_TO_INIT);
-			}
+//			if (FSM_Get_State() == FSM_FAULT)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_TO_INIT);
+//			}
 
-			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_INIT);
-			}
-			break;
-		}
+//			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_INIT);
+//			}
+//			break;
+//		}
 
-		case FSM_READY_TO_OPERATE:
-		{
+//		case FSM_READY_TO_OPERATE:
+//		{
 
-			if (FSM_Get_State() == FSM_INIT)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_INIT_TO_READY_TO_OPERATE);
-			}
+//			if (FSM_Get_State() == FSM_INIT)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_INIT_TO_READY_TO_OPERATE);
+//			}
 
-			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE);
-			}
+//			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE);
+//			}
 
-			break;
-		}
+//			break;
+//		}
 
-		case FSM_OPERATION_ENABLE:
-		{
-			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
-			}
-			break;
-		}
+//		case FSM_OPERATION_ENABLE:
+//		{
+//			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
+//			}
+//			break;
+//		}
 
 		case FSM_CALIBRATION_PHASE_0:
 		{
@@ -1545,29 +1542,28 @@ bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition shoul
 			break;
 		}
 
-		case FSM_FAULT_REACTION_ACTIVE:
-		{
-			if (FSM_Get_State() != FSM_START)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT);
-			}
-			break;
-		}
+//		case FSM_FAULT_REACTION_ACTIVE:
+//		{
+//			if (FSM_Get_State() != FSM_START)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT);
+//			}
+//			break;
+//		}
 
-		case FSM_FAULT:
-		{
-			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
-			{
-				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
-			}
-			break;
-		}
+//		case FSM_FAULT:
+//		{
+//			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
+//			}
+//			break;
+//		}
 
 		default:
 		{
 			break;
 		}
-//#endif
 	}
 
 	return false;

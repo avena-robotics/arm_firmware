@@ -49,6 +49,9 @@ typedef struct Gripper_Pump_Configuration_Handle {
 //	bool canbus_watchdog_enabled;
 } __attribute__ ((packed)) Gripper_Pump_Configuration_Handle_t;
 
+typedef struct Gripper_Pump_Command_Handle {
+	bool enable_pump;			//
+} __attribute__ ((packed)) Gripper_Pump_Command_Handle_t;
 typedef struct _Status_Handle {
 	bool b_pump_is_working; // current over "0" limit
 	bool b_pressure_level_1; // input from sensor - level 1
@@ -79,7 +82,7 @@ uint8_t can_tx_data[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};  //
 
 Gripper_Pump_Configuration_Handle_t g_gripper_pump_configuration = {
 	.safety_enabled = false,
-	.can_node_id = 0x0A,
+	.can_node_id = 0x07,
 };
 
 volatile Counters_Handle_t g_counters = {
@@ -95,6 +98,10 @@ volatile FSMStatus_t 	g_fsm_status = {
 	.state = FSM_START,
 	.state_is_running = false,
 	.transition_is_running = false,
+};
+
+Gripper_Pump_Command_Handle_t g_gripper_pump_command = {
+	.enable_pump = false,
 };
 volatile Gripper_Pump_Status_Handle_t 	g_gripper_pump_status = {
 
@@ -258,6 +265,30 @@ void FSM_START_Callback()
 	HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
 }
 
+void FSM_READY_TO_OPERATE_Callback() 
+{
+	g_gripper_pump_command.enable_pump = false;
+	HAL_GPIO_WritePin(PUMP_ON_GPIO_Port, PUMP_ON_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(LED_ON_GPIO_Port, LED_ON_Pin, GPIO_PIN_RESET);
+	g_gripper_pump_status.b_pressure_level_1 = (HAL_GPIO_ReadPin(WEJSCIE_1_GPIO_Port, WEJSCIE_1_Pin) == GPIO_PIN_SET) ? (0) : (1);
+	g_gripper_pump_status.b_pressure_level_2 = (HAL_GPIO_ReadPin(WEJSCIE_2_GPIO_Port, WEJSCIE_2_Pin) == GPIO_PIN_SET) ? (0) : (1);
+}
+
+void FSM_OPERATION_ENABLE_Callback() 
+{
+	HAL_GPIO_WritePin(LED_ON_GPIO_Port, LED_ON_Pin, GPIO_PIN_SET);
+	if (g_gripper_pump_command.enable_pump)
+	{
+		HAL_GPIO_WritePin(PUMP_ON_GPIO_Port, PUMP_ON_Pin, GPIO_PIN_SET);
+	}
+	else
+	{
+		HAL_GPIO_WritePin(PUMP_ON_GPIO_Port, PUMP_ON_Pin, GPIO_PIN_RESET);
+	}
+	g_gripper_pump_status.b_pressure_level_1 = (HAL_GPIO_ReadPin(WEJSCIE_1_GPIO_Port, WEJSCIE_1_Pin) == GPIO_PIN_SET) ? (0) : (1);
+	g_gripper_pump_status.b_pressure_level_2 = (HAL_GPIO_ReadPin(WEJSCIE_2_GPIO_Port, WEJSCIE_2_Pin) == GPIO_PIN_SET) ? (0) : (1);
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) 
 {
 	// SECURITY ALERT
@@ -327,23 +358,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 				dlugosc_danych_polecenia = 2;
 				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
 
-				int16_t goal;
-				goal  = can_rx_data[offset] << 8;
-				goal += can_rx_data[offset + 1];
+				g_gripper_pump_command.enable_pump = can_rx_data[offset];
 
 				// -------------------------------------------------------------------------------------------------
-//				can_tx_data[0] 	= l_joint_position_in_s32degree >> 24;
-//				can_tx_data[1] 	= l_joint_position_in_s32degree >> 16;
-//				can_tx_data[2] 	= l_joint_position_in_s32degree >> 8;
-//				can_tx_data[3] 	= l_joint_position_in_s32degree;
-//				can_tx_data[4] 	= l_speed_in_dpp >> 8;
-//				can_tx_data[5] 	= l_speed_in_dpp;
-//				can_tx_data[6] 	= l_current_torque_in_s16a >> 8;
-//				can_tx_data[7] 	= l_current_torque_in_s16a;
-//				can_tx_data[8] 	= (uint8_t) g_joint_status.current_bearing_temperature;
+				can_tx_data[0] 	= g_gripper_pump_status.b_pressure_level_1;
+				can_tx_data[1] 	= g_gripper_pump_status.b_pressure_level_2;
 				can_tx_data[9] 	= FSM_Get_State(); // FSM
-//				can_tx_data[10]	= g_joint_status.mc_current_faults_motor;
-//				can_tx_data[11] = g_joint_status.mc_occured_faults_motor;
 				can_tx_data[12] = g_gripper_pump_status.errors;
 				can_tx_data[13] = g_gripper_pump_status.warnings;
 
@@ -372,29 +392,29 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 				break;
 			}
 
-			case 0xB: // SET CAN ID
-			{
-				if (FSM_Get_State() == FSM_INIT)
-				{
-					dlugosc_danych_polecenia = 1;
-					// uint8_t - can id
-					uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
-					g_gripper_pump_configuration.can_node_id = can_rx_data[offset]; // moze byc od 0 do F - TODO: zapis do FLASH i restart
+//			case 0xB: // SET CAN ID
+//			{
+//				if (FSM_Get_State() == FSM_INIT)
+//				{
+//					dlugosc_danych_polecenia = 1;
+//					// uint8_t - can id
+//					uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
+//					g_gripper_pump_configuration.can_node_id = can_rx_data[offset]; // moze byc od 0 do F - TODO: zapis do FLASH i restart
 
-					// FLASH_Configuration_Save(); // flash configuration
-					FDCAN_Set_Filters(); // reload can filters
+//					// FLASH_Configuration_Save(); // flash configuration
+//					FDCAN_Set_Filters(); // reload can filters
 
-					can_tx_data[0] = 1;
-				}
-				else
-				{
-					can_tx_data[0] = 0;
-				}
+//					can_tx_data[0] = 1;
+//				}
+//				else
+//				{
+//					can_tx_data[0] = 0;
+//				}
 
 
-				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
-				break;
-			}
+//				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
+//				break;
+//			}
 
 			case 0xF: // Konfiguracja
 			{

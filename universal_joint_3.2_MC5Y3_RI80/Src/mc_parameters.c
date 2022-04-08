@@ -132,17 +132,17 @@ R3_2_Params_t R3_2_ParamsM1 =
  .pwm_en_w_pin       = (uint16_t) 0,
 
 /* Emergency input (BKIN2) signal initialization -----------------------------*/
-  .BKIN2Mode     = INT_MODE,
+  .BKIN2Mode     = NONE,
 
 /* Internal OPAMP common settings --------------------------------------------*/
   .OPAMPParams     = &R3_3_OPAMPParamsM1,
 /* Internal COMP settings ----------------------------------------------------*/
-  .CompOCPASelection     = COMP1,
-  .CompOCPAInvInput_MODE = INT_MODE,
-  .CompOCPBSelection     = COMP2,
-  .CompOCPBInvInput_MODE = INT_MODE,
-  .CompOCPCSelection     = COMP4,
-  .CompOCPCInvInput_MODE = INT_MODE,
+  .CompOCPASelection     = MC_NULL,
+  .CompOCPAInvInput_MODE = NONE,
+  .CompOCPBSelection     = MC_NULL,
+  .CompOCPBInvInput_MODE = NONE,
+  .CompOCPCSelection     = MC_NULL,
+  .CompOCPCInvInput_MODE = NONE,
   .DAC_OCP_ASelection    = MC_NULL,
   .DAC_OCP_BSelection    = MC_NULL,
   .DAC_OCP_CSelection    = MC_NULL,

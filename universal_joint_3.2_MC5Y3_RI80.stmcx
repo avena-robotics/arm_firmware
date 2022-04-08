@@ -27,7 +27,7 @@
 						</var>
 						<var version="1.0" type="MC_Int" name="Pole Pairs" enable="true" visible="true" readonly="false" value="7" />
 						<var version="1.0" type="MC_Int" name="Max Rated Speed" enable="true" visible="true" readonly="false" value="2424" />
-						<var version="1.0" type="MC_Double" name="Nominal Current" enable="true" visible="true" readonly="false" value="22" />
+						<var version="1.0" type="MC_Double" name="Nominal Current" enable="true" visible="true" readonly="false" value="25" />
 						<var version="1.0" type="MC_Double" name="Nominal DC Voltage" enable="true" visible="true" readonly="false" value="48" />
 						<var version="1.0" type="MC_Double" name="Rs" enable="true" visible="true" readonly="false" value="0.15" />
 						<var version="1.0" type="MC_Double" name="Ld" enable="true" visible="true" readonly="false" value="0.318" />
@@ -162,15 +162,15 @@
 						<var version="1.0" type="MC_Bool" name="xAllDrive" enable="true" visible="true" readonly="true" value="true" />
 						<var version="1.0" type="MC_Bool" name="xAllDriver_signal_enable" enable="true" visible="true" readonly="false" value="false" />
 						<var version="1.0" type="MC_Bool" name="use_STGAP1S" enable="true" visible="true" readonly="false" value="false" />
-						<var version="1.0" type="MC_Double" name="SettParamGain - Input - Imax" enable="true" visible="true" readonly="false" value="30" />
+						<var version="1.0" type="MC_Double" name="SettParamGain - Input - Imax" enable="true" visible="true" readonly="false" value="45" />
 						<var version="1.0" type="MC_Double" name="SettParamGain - Input - Vm" enable="true" visible="true" readonly="false" value="3.3000000000000003" />
-						<var version="1.0" type="MC_Double" name="SettParamGain - Input - Prating" enable="true" visible="true" readonly="false" value="4" />
-						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R1" enable="true" visible="true" readonly="false" value="680" />
-						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R2" enable="true" visible="true" readonly="false" value="6800" />
-						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R3" enable="true" visible="true" readonly="false" value="1000" />
-						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R4" enable="true" visible="true" readonly="false" value="1000" />
-						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R5" enable="true" visible="true" readonly="false" value="4700" />
-						<var version="1.0" type="MC_Bool" name="SettParamGain - Input - R3using" enable="true" visible="true" readonly="false" value="false" />
+						<var version="1.0" type="MC_Double" name="SettParamGain - Input - Prating" enable="true" visible="true" readonly="false" value="2" />
+						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R1" enable="true" visible="true" readonly="false" value="1500" />
+						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R2" enable="true" visible="true" readonly="false" value="22000" />
+						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R3" enable="true" visible="true" readonly="false" value="22000" />
+						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R4" enable="true" visible="true" readonly="false" value="1500" />
+						<var version="1.0" type="MC_Double" name="SettParamGain - Input - R5" enable="true" visible="true" readonly="false" value="11000" />
+						<var version="1.0" type="MC_Bool" name="SettParamGain - Input - R3using" enable="true" visible="true" readonly="false" value="true" />
 						<var version="1.0" type="MC_Bool" name="SettParamGain - Input - R4R5fixed" enable="true" visible="true" readonly="false" value="false" />
 					</vars>
 					<temperature_sensing version="1.0">
@@ -1103,7 +1103,7 @@
 							</items>
 						</var>
 						<var version="1.0" type="MC_Bool" name="AI - PCF - PGA" enable="true" visible="true" readonly="false" value="true" />
-						<var version="1.0" type="MC_Bool" name="AI - PCF - HW OCP" enable="true" visible="true" readonly="false" value="true" />
+						<var version="1.0" type="MC_Bool" name="AI - PCF - HW OCP" enable="true" visible="true" readonly="false" value="false" />
 						<var version="1.0" type="MC_List" name="AI - PCF - Sens - Setting - Sampling Time" enable="true" visible="true" readonly="false" value="1">
 							<items>
 								<item tag="25" text="2.5" />
@@ -1287,8 +1287,8 @@
 								<item tag="102" text="A2" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_Bool" name="AI - PCF - Protection - Over current using" enable="true" visible="true" readonly="false" value="true" />
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - Digital filter duration" enable="true" visible="true" readonly="false" value="5">
+						<var version="1.0" type="MC_Bool" name="AI - PCF - Protection - Over current using" enable="true" visible="true" readonly="false" value="false" />
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - Digital filter duration" enable="false" visible="true" readonly="false" value="5">
 							<items>
 								<item tag="0" text="0" />
 								<item tag="1" text="2" />
@@ -1308,17 +1308,17 @@
 								<item tag="15" text="512" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Setting - Inverting input" enable="true" visible="true" readonly="false" value="0">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Setting - Inverting input" enable="false" visible="true" readonly="false" value="0">
 							<items>
 								<item tag="1" text="Internal" />
 								<item tag="0" text="External" />
 								<item tag="2" text="DAC" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_Double" name="AI - PCF - Protection - COMP_EMB - Setting - Current threshold" enable="true" visible="true" readonly="true" value="23.182000000000002" />
-						<var version="1.0" type="MC_Double" name="AI - PCF - Protection - COMP_EMB - Setting - Comparator input threshold" enable="true" visible="true" readonly="true" value="0.3" />
-						<var version="1.0" type="MC_Bool" name="AI - PCF - Protection - COMP_EMB - Setting - Output enable" enable="true" visible="true" readonly="false" value="false" />
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase U - Comp" enable="true" visible="true" readonly="true" value="1">
+						<var version="1.0" type="MC_Double" name="AI - PCF - Protection - COMP_EMB - Setting - Current threshold" enable="false" visible="true" readonly="true" value="23.182000000000002" />
+						<var version="1.0" type="MC_Double" name="AI - PCF - Protection - COMP_EMB - Setting - Comparator input threshold" enable="false" visible="true" readonly="true" value="0.3" />
+						<var version="1.0" type="MC_Bool" name="AI - PCF - Protection - COMP_EMB - Setting - Output enable" enable="false" visible="true" readonly="false" value="false" />
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase U - Comp" enable="false" visible="true" readonly="true" value="1">
 							<items>
 								<item tag="0" text="NONE" />
 								<item tag="1" text="COMP1" />
@@ -1331,7 +1331,7 @@
 								<item tag="0" text="NONE" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase V - Comp" enable="true" visible="true" readonly="true" value="2">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase V - Comp" enable="false" visible="true" readonly="true" value="2">
 							<items>
 								<item tag="0" text="NONE" />
 								<item tag="1" text="COMP1" />
@@ -1344,7 +1344,7 @@
 								<item tag="0" text="NONE" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase W - Comp" enable="true" visible="true" readonly="true" value="4">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase W - Comp" enable="false" visible="true" readonly="true" value="4">
 							<items>
 								<item tag="0" text="NONE" />
 								<item tag="1" text="COMP1" />
@@ -1357,33 +1357,33 @@
 								<item tag="0" text="NONE" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - Inverting input" enable="true" visible="true" readonly="false" value="0">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - Inverting input" enable="false" visible="true" readonly="false" value="0">
 							<items>
 								<item tag="0" text="none" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - Inverting input phase V" enable="true" visible="true" readonly="false" value="0">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - Inverting input phase V" enable="false" visible="true" readonly="false" value="0">
 							<items>
 								<item tag="0" text="none" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - Inverting input phase W" enable="true" visible="true" readonly="false" value="0">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - Inverting input phase W" enable="false" visible="true" readonly="false" value="0">
 							<items>
 								<item tag="0" text="none" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase U - No inverting" enable="true" visible="true" readonly="true" value="0">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase U - No inverting" enable="false" visible="true" readonly="true" value="0">
 							<items>
 								<item tag="101" text="A1" />
 								<item tag="103" text="A3" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase V - No inverting" enable="true" visible="true" readonly="true" value="0">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase V - No inverting" enable="false" visible="true" readonly="true" value="0">
 							<items>
 								<item tag="107" text="A7" />
 							</items>
 						</var>
-						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase W - No inverting" enable="true" visible="true" readonly="true" value="0">
+						<var version="1.0" type="MC_List" name="AI - PCF - Protection - COMP_EMB - Pin - phase W - No inverting" enable="false" visible="true" readonly="true" value="0">
 							<items>
 								<item tag="200" text="B0" />
 							</items>

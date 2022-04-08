@@ -59,14 +59,16 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define PUMP_VOLTAGE_Pin GPIO_PIN_0
 #define PUMP_VOLTAGE_GPIO_Port GPIOA
-#define WEJSCIE_1_Pin GPIO_PIN_2
-#define WEJSCIE_1_GPIO_Port GPIOA
-#define WEJSCIE_2_Pin GPIO_PIN_3
+#define WEJSCIE_2_Pin GPIO_PIN_2
 #define WEJSCIE_2_GPIO_Port GPIOA
+#define WEJSCIE_1_Pin GPIO_PIN_3
+#define WEJSCIE_1_GPIO_Port GPIOA
 #define PUMP_CURRENT_Pin GPIO_PIN_4
 #define PUMP_CURRENT_GPIO_Port GPIOA
 #define PUMP_ON_Pin GPIO_PIN_0
 #define PUMP_ON_GPIO_Port GPIOB
+#define LED_ON_Pin GPIO_PIN_15
+#define LED_ON_GPIO_Port GPIOA
 #define SEC_IN_Pin GPIO_PIN_6
 #define SEC_IN_GPIO_Port GPIOB
 #define SEC_IN_EXTI_IRQn EXTI9_5_IRQn

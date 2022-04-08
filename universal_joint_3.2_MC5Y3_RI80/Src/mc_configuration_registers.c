@@ -55,7 +55,7 @@ const MotorConfig_reg_t M1_MotorConfig_reg =
   .rs = 0.15,
   .ls = 0.000318*1.000,
   .ld = 0.000318,
-  .maxCurrent = 16012,
+  .maxCurrent = 18195,
   .name = "No Name M1"
 };
 

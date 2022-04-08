@@ -109,7 +109,94 @@ __attribute__((weak)) void FSM_Tick_Callback()
 //bool FSM_Set_State(FSM_State_t new_state) 
 bool FSM_Set_State(uint8_t new_state) 
 {
-	return FSM_Set_State_Callback(new_state);
+	switch (new_state)
+	{
+		case FSM_START:
+		{
+			break;
+		}
+
+		case FSM_INIT:
+		{
+			if (FSM_Get_State() == FSM_START)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT);
+			}
+
+			if (FSM_Get_State() == FSM_FAULT)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_TO_INIT);
+			}
+
+			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_INIT);
+			}
+			break;
+		}
+
+		case FSM_READY_TO_OPERATE:
+		{
+
+			if (FSM_Get_State() == FSM_INIT)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_INIT_TO_READY_TO_OPERATE);
+			}
+
+			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE);
+			}
+
+			break;
+		}
+
+		case FSM_OPERATION_ENABLE:
+		{
+			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
+			}
+			break;
+		}
+
+//		case FSM_CALIBRATION_PHASE_0:
+//		{
+
+//			if (FSM_Get_State() == FSM_INIT)
+//			{
+//				return FSM_Activate_Transition(FSM_TRANSITION_INIT_TO_CALIBRATION_PHASE_0);
+//			}
+
+//			break;
+//		}
+
+		case FSM_FAULT_REACTION_ACTIVE:
+		{
+			if (FSM_Get_State() != FSM_START)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT);
+			}
+			break;
+		}
+
+		case FSM_FAULT:
+		{
+			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
+			{
+				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
+			}
+			break;
+		}
+
+		default:
+		{
+			return FSM_Set_State_Callback(new_state);
+			break;
+		}
+	}	
+	
+	return false;
 }
 
 void FSM_Tick() 
