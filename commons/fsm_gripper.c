@@ -81,6 +81,23 @@ volatile FSMStatus_t 	g_fsm_status = {
 };
 
 
+NTC_Handle_t   g_TempBearingSensorParamsM1 = {
+  .bSensorType = REAL_SENSOR,
+  .TempRegConv =
+  {
+    .regADC = ADC2,
+    .channel = MC_ADC_CHANNEL_17,
+    .samplingTime = M1_TEMP_SAMPLING_TIME,
+  },
+  .hLowPassFilterBW        = M1_TEMP_SW_FILTER_BW_FACTOR,
+  .hOverTempThreshold      = (uint16_t)(OV_TEMPERATURE_THRESHOLD_d),
+  .hOverTempDeactThreshold = (uint16_t)(OV_TEMPERATURE_THRESHOLD_d - OV_TEMPERATURE_HYSTERESIS_d),
+  .hSensitivity            = (uint16_t)(ADC_REFERENCE_VOLTAGE/dV_dT),
+  .wV0                     = (uint16_t)(V0_V *65536/ ADC_REFERENCE_VOLTAGE),
+  .hT0                     = T0_C,
+};
+
+
 // Calibration variables
 volatile Calibration_State_t g_calibration_state = CALIBRATION_NOT_FINISHED;
 
@@ -98,23 +115,6 @@ volatile uint16_t g_calibration_data_2_errors = 0;
 int16_t g_current_sector_number = -1;
 int16_t g_previous_sector_number = -1;
 int16_t g_current_estimated_electric_rotation = -1;
-
-NTC_Handle_t   g_TempBearingSensorParamsM1 = {
-  .bSensorType = REAL_SENSOR,
-  .TempRegConv =
-  {
-    .regADC = ADC2,
-    .channel = MC_ADC_CHANNEL_17,
-    .samplingTime = M1_TEMP_SAMPLING_TIME,
-  },
-  .hLowPassFilterBW        = M1_TEMP_SW_FILTER_BW_FACTOR,
-  .hOverTempThreshold      = (uint16_t)(OV_TEMPERATURE_THRESHOLD_d),
-  .hOverTempDeactThreshold = (uint16_t)(OV_TEMPERATURE_THRESHOLD_d - OV_TEMPERATURE_HYSTERESIS_d),
-  .hSensitivity            = (uint16_t)(ADC_REFERENCE_VOLTAGE/dV_dT),
-  .wV0                     = (uint16_t)(V0_V *65536/ ADC_REFERENCE_VOLTAGE),
-  .hT0                     = T0_C,
-};
-
 
 // LOCAL FUNCTIONS DEFINITIONS
 FSM_State_t FSM_Get_State(void);
@@ -156,7 +156,8 @@ void UJ_Init() {
 }
 
 // MOTOR
-void motor_start(Working_Mode_t mode, int16_t goal) {
+void motor_start(Working_Mode_t mode, int16_t goal) 
+{
 
 	g_joint_command.working_mode = mode;
 
@@ -196,7 +197,8 @@ void motor_start(Working_Mode_t mode, int16_t goal) {
 	}
 }
 
-void motor_stop() {
+void motor_stop() 
+{
 
 	// clear torque readings
 	for (int i = 0; i < CURRENT_TORQUE_DATA_SIZE; i++)
@@ -215,14 +217,16 @@ void motor_stop() {
 	MC_StopMotor1();
 }
 
-bool motor_reach_torque_limit() {
+bool motor_reach_torque_limit() 
+{
 	if (g_joint_status.mc_current_motor_torque > g_calibration_torque_limit && g_joint_status.stm_state_motor == RUN) return true;
 
 	return false;
 }
 
 
-bool motor_in_position(volatile int32_t position) {
+bool motor_in_position(volatile int32_t position) 
+{
 	if (abs((int64_t) g_joint_status.mc_current_motor_position_multiturn - position) < CALIBRATION_ZERO_POSITION_OFFSET) return true;
 
 	return false;
@@ -230,7 +234,8 @@ bool motor_in_position(volatile int32_t position) {
 
 
 // CALIBRATION
-bool check_calibration_data_cw(int16_t size) {
+bool check_calibration_data_cw(int16_t size) 
+{
 	g_calibration_data_1_errors = 0;
 
 	for (int i = 0; i < size; i++) {
@@ -246,7 +251,8 @@ bool check_calibration_data_cw(int16_t size) {
 }
 
 
-bool check_calibration_data_ccw(int16_t size) {
+bool check_calibration_data_ccw(int16_t size) 
+{
 	g_calibration_data_2_errors = 0;
 
 	for (int i = 0; i < size; i++) {
@@ -258,7 +264,9 @@ bool check_calibration_data_ccw(int16_t size) {
 
 	return true;
 }
-int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset) {
+
+int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset) 
+{
     if (right_index >= left_index) {
     	int16_t mid = left_index + (right_index - left_index) / 2; // srodek
 
@@ -310,7 +318,8 @@ int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_i
     // present in array
     return -1; // element poza sektorami
 }
-int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset, bool ccw) {
+int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset, bool ccw) 
+{
     if (right_index >= left_index)
     {
     	int16_t mid = left_index + (right_index - left_index) / 2; // srodek zakresu tablicy
@@ -406,7 +415,8 @@ int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t
     return -1; // element poza sektorami
 }
 
-void Read_MC_Encoder_1kHz() {
+void Read_MC_Encoder_1kHz() 
+{
 	// READ POSITION
 	g_joint_status.mc_previous_motor_position = g_joint_status.mc_current_motor_position; // store old position
 	g_joint_status.mc_current_motor_position = ENCODER_M1.PreviousCapture; // 0 ... 14336 - 1 mechanical motor rotation
@@ -438,13 +448,15 @@ void Read_MC_Encoder_1kHz() {
 	g_joint_status._current_speed_index %= CURRENT_SPEED_DATA_SIZE;
 }
 
-void Read_MC_Torque() {
+void Read_MC_Torque() 
+{
 	// READ TORQUE
 	g_joint_status._current_torque_data[g_joint_status._current_torque_index++] = MC_GetPhaseCurrentAmplitudeMotor1();
 	g_joint_status._current_torque_index %= CURRENT_TORQUE_DATA_SIZE;
 }
 
-void Read_MC_State() {
+void Read_MC_State() 
+{
 	g_joint_status.stm_state_motor 				= MC_GetSTMStateMotor1();
 	g_joint_status.mc_current_faults_motor 		= (uint8_t) MC_GetCurrentFaultsMotor1();
 	g_joint_status.mc_occured_faults_motor 		= (uint8_t) MC_GetOccurredFaultsMotor1();
@@ -458,7 +470,8 @@ void Read_MC_State() {
 
 }
 
-void Update_Data_From_MC() {
+void Update_Data_From_MC() 
+{
 	// POSITION
 	g_joint_status.f_current_motor_position = ((double) g_joint_status.mc_current_motor_position_multiturn / ENCODER_M1.PulseNumber) * M_TWOPI;
 	g_joint_status.f_current_joint_position_multiturn = (double) g_joint_status.f_current_motor_position / g_joint_configuration.gear_ratio + g_joint_status.f_current_encoder_position_offset;
@@ -489,7 +502,8 @@ void Update_Data_From_MC() {
 
 }
 
-void CheckErrorsAndWarnings() {
+void CheckErrorsAndWarnings() 
+{
 	bool error = false;
 
 	// MOTOR CONTROL ERROR REACTION
@@ -584,7 +598,8 @@ void FDCAN_Set_Filters() {
 }
 
 // FLASH
-void Flash_Read_Data(uint32_t StartPageAddress, uint32_t *RxBuf, uint16_t numberofwords) {
+void Flash_Read_Data(uint32_t StartPageAddress, uint32_t *RxBuf, uint16_t numberofwords) 
+{
 	while (1)
 	{
 		*RxBuf = *(__IO uint32_t *)StartPageAddress;
@@ -594,7 +609,8 @@ void Flash_Read_Data(uint32_t StartPageAddress, uint32_t *RxBuf, uint16_t number
 	}
 }
 
-void FLASH_Configuration_Load() {
+void FLASH_Configuration_Load() 
+{
 	Flash_Read_Data(g_flash_address_configuration, (uint32_t *) g_calibration_config, 10);
 
 	g_joint_configuration.calibration_table_size 			= g_calibration_config[8]; // FIXME !!!!
@@ -635,7 +651,8 @@ void FLASH_Configuration_Load() {
 
 }
 
-uint32_t FLASH_Configuration_Save() {
+uint32_t FLASH_Configuration_Save() 
+{
 	volatile uint32_t error = 0;
 	uint64_t data;
 
@@ -706,22 +723,26 @@ uint32_t FLASH_Configuration_Save() {
 }
 
 // FSM
-void FSM_Action() {
+void FSM_Action() 
+{
 }
 
-bool FSM_Activate_State(FSM_State_t new_state) {
+bool FSM_Activate_State(FSM_State_t new_state) 
+{
 	g_fsm_status.state = new_state;
 	return true;
 }
 
 
-bool FSM_Activate_Transition(FSM_State_t new_transition) {
+bool FSM_Activate_Transition(FSM_State_t new_transition) 
+{
 	g_fsm_status.state = new_transition;
 	return true;
 }
 
 
-bool FSM_Set_State(FSM_State_t new_state) {
+bool FSM_Set_State(FSM_State_t new_state) 
+{
 
 	switch (new_state)
 	{
@@ -816,14 +837,16 @@ bool FSM_Set_State(FSM_State_t new_state) {
 }
 
 
-FSM_State_t FSM_Get_State(void) {
+FSM_State_t FSM_Get_State(void) 
+{
 	return g_fsm_status.state;
 }
 
 
 
 // MA730
-void MA730_ReadRegister(uint8_t reg_number) {
+void MA730_ReadRegister(uint8_t reg_number) 
+{
 	uint16_t send_data      = 0b010 << 13 | (reg_number & (0b00011111)) << 8 ;
 
 	uint16_t angle_value    = 0;
@@ -930,7 +953,8 @@ void MA730_ReadRegister(uint8_t reg_number) {
 
 
 
-void MA730_ReadAngle() {
+void MA730_ReadAngle() 
+{
 	uint16_t send_data      = 0x0000 ;
 
 	uint16_t angle_value    = 0;
@@ -951,7 +975,8 @@ void MA730_ReadAngle() {
 	g_ma730.angle = (angle_value >> 2) & 0b0011111111111111;
 
 }
-void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value) {
+void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value) 
+{
 	uint16_t send_data      = 0b100 << 13 | (reg_number & (0b00011111)) << 8 | reg_value;
 
 	uint16_t angle_value    = 0;
@@ -988,7 +1013,8 @@ void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value) {
 
 
 // Temperature
-float Calculate_ADC_to_Temperature(uint16_t adc_data, uint16_t beta, uint8_t ntc_nominal_temperature, uint16_t ntc_nominal_resistance, uint16_t series_resistance) {
+float Calculate_ADC_to_Temperature(uint16_t adc_data, uint16_t beta, uint8_t ntc_nominal_temperature, uint16_t ntc_nominal_resistance, uint16_t series_resistance) 
+{
 
 	double vo = (double) adc_data / 65536.0;
 
@@ -1010,7 +1036,8 @@ float Calculate_ADC_to_Temperature(uint16_t adc_data, uint16_t beta, uint8_t ntc
 
 
 // HAL Callbacks
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) 
+{
 	// SECURITY ALERT
     if(GPIO_Pin == SEC_IN_Pin && g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
     {
@@ -1020,7 +1047,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 }
 
 
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi) {
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi) 
+{
 	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
 
     // TX-RX Done .. Do Something ...
@@ -1040,7 +1068,8 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi) {
 
 }
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) 
+{
 	if(htim->Instance == TIM6) 	// 10kHz (5,0) - fast recalculation
 	{
 		g_counters.timer6++;
@@ -1640,7 +1669,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		g_counters.timer7++;
 	}
 }
-void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs) {
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs) 
+{
 
 	if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
 	{
@@ -1923,13 +1953,15 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 }
 
 
-void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) 
+{
 //	g_counter2++;
 }
 
 
 
-void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) 
+{
 //	g_counter2++;
 
 }
@@ -1937,7 +1969,8 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
 
 
 // MC SDK Override Functions
-int16_t NTC_GetAvTemp_C( NTC_Handle_t * pHandle ) {
+int16_t NTC_GetAvTemp_C( NTC_Handle_t * pHandle ) 
+{
   int32_t wTemp;
 
   if ( pHandle->bSensorType == REAL_SENSOR )
@@ -1954,7 +1987,8 @@ int16_t NTC_GetAvTemp_C( NTC_Handle_t * pHandle ) {
 }
 
 
-uint16_t NTC_CalcAvTemp( NTC_Handle_t * pHandle ) {
+uint16_t NTC_CalcAvTemp( NTC_Handle_t * pHandle ) 
+{
 	
   uint32_t wtemp;
   uint16_t hAux;
@@ -1984,7 +2018,8 @@ uint16_t NTC_CalcAvTemp( NTC_Handle_t * pHandle ) {
   return ( pHandle->hFaultState );
 }
 
-int32_t MCM_Sqrt( int32_t wInput ) {
+int32_t MCM_Sqrt( int32_t wInput ) 
+{
 	 int32_t wtemprootnew;
 
 		  if ( wInput > 0 )

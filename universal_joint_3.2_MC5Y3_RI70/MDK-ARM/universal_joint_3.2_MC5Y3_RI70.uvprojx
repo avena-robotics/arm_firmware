@@ -48,7 +48,7 @@
             <NotGenerated>0</NotGenerated>
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
-          <OutputDirectory>universal_joint_3.2_MC5Y3_RI70\</OutputDirectory>
+          <OutputDirectory>.\universal_joint_3.2_MC5Y3_RI70\</OutputDirectory>
           <OutputName>universal_joint_3.2_MC5Y3_RI70</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
@@ -489,9 +489,14 @@
           <GroupName>Commons</GroupName>
           <Files>
             <File>
-              <FileName>commons.c</FileName>
+              <FileName>commons_uj.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\commons\commons.c</FilePath>
+              <FilePath>..\..\commons\commons_uj.c</FilePath>
+            </File>
+            <File>
+              <FileName>fsm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\commons\fsm.c</FilePath>
             </File>
           </Files>
         </Group>
