@@ -4,6 +4,11 @@
 //#pragma GCC push_options
 //#pragma GCC optimize ("O0")
 
+// SDK_VERSION
+// 5.Y.3 // 0x055a0300
+// 5.Y.4 // 0x055a0400
+
+
 FDCAN_RxHeaderTypeDef can_rx_header; // CAN Bus Transmit Header
 FDCAN_TxHeaderTypeDef can_tx_header; // CAN Bus Transmit Header
 uint8_t can_rx_data[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};  //CAN Bus Receive Buffer
@@ -24,13 +29,13 @@ float g_diff_current_electric_position;
 float g_electric_offset_to_zero_in_rad;
 float g_encoder_offset_to_current_in_rad;
 
-float g_temp_1;
-int16_t g_temp_2;
-float g_temp_3;
-float g_temp_4;
-int16_t g_temp_5;
-int16_t g_temp_6;
-uint16_t g_temp_7;
+// float g_temp_1;
+//int16_t g_temp_2;
+//float g_temp_3;
+//float g_temp_4;
+//int16_t g_temp_5;
+//int16_t g_temp_6;
+//uint16_t g_temp_7;
 
 uint16_t g_mgh_errors = 0;
 uint16_t g_mgl_errors = 0;
@@ -76,7 +81,7 @@ App_Command_Handle_t g_joint_command = {
 
 
 Joint_Configuration_Handle_t g_joint_configuration = {
-	.ma730_enabled = true,
+	.ma730_enabled = false,
 	.safety_enabled = false,
 	.working_area_constrain_enabled = false,
 	.motor_type = MOTOR_TYPE,
@@ -86,7 +91,8 @@ Joint_Configuration_Handle_t g_joint_configuration = {
 
 
 Joint_Status_Handle_t g_joint_status = {
-	.mc_current_motor_position = 0
+	.mc_current_motor_position = 0,
+	.encoder_position_state = POSITION_UNKNOWN
 };
 
 volatile MA730_Handle_t	g_ma730 = {
@@ -123,6 +129,7 @@ float Calculate_ADC_to_Temperature(uint16_t adc_data, uint16_t beta, uint8_t nom
 void MA730_ReadRegister(uint8_t reg_number);
 void MA730_ReadAngle(void);
 void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value);
+void motor_stop(void);
 
 // FUNCTIONS BODIES
 void UJ_Init() {
@@ -190,7 +197,7 @@ void motor_start(Working_Mode_t mode, int16_t goal)
 
 		default:
 		{
-			MC_StopMotor1();
+			motor_stop();
 		}
 	}
 }
@@ -198,21 +205,24 @@ void motor_start(Working_Mode_t mode, int16_t goal)
 void motor_stop() 
 {
 
-	// clear torque readings
-	for (int i = 0; i < CURRENT_TORQUE_DATA_SIZE; i++)
+	if (g_joint_status.stm_state_motor == RUN)
 	{
-		g_joint_status._current_torque_data[i] = 0;
+		// clear torque readings
+		for (int i = 0; i < CURRENT_TORQUE_DATA_SIZE; i++)
+		{
+			g_joint_status._current_torque_data[i] = 0;
+		}
+
+		g_joint_command._motor_torque = 0;
+		g_joint_command.motor_torque = 0;
+		g_joint_command.joint_torque = 0;
+
+		g_joint_command._motor_speed = 0;
+		g_joint_command.motor_speed = 0;
+		g_joint_command.joint_speed = 0;
+
+		MC_StopMotor1();
 	}
-
-	g_joint_command._motor_torque = 0;
-	g_joint_command.motor_torque = 0;
-	g_joint_command.joint_torque = 0;
-
-	g_joint_command._motor_speed = 0;
-	g_joint_command.motor_speed = 0;
-	g_joint_command.joint_speed = 0;
-
-	MC_StopMotor1();
 }
 
 bool motor_reach_torque_limit() 
@@ -263,61 +273,7 @@ bool check_calibration_data_ccw(int16_t size)
 	return true;
 }
 
-//int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset) 
-//{
-//    if (right_index >= left_index) {
-//    	int16_t mid = left_index + (right_index - left_index) / 2; // srodek
 
-//    	uint32_t mid_left_value  = g_joint_configuration.calibration_table_1[mid];    // wartosc lewego brzegu sektora
-//    	uint32_t mid_right_value = g_joint_configuration.calibration_table_2[mid];    // wartosc prawego brzegu sektora
-//    	uint32_t searched_value  = ma730_value; // wartosc szukana
-
-//    	// Przesuniecie wartosci o offset, by funkcja byla w calej dlugosci ciagla
-//    	if (mid_left_value <= offset)
-//    	{
-//    		mid_left_value += 16384;
-//    	}
-
-//    	if (mid_right_value <= offset)
-//    	{
-//    		mid_right_value += 16384;
-//    	}
-
-//    	if (searched_value <= offset)
-//    	{
-//    		searched_value += 16384;
-//    	}
-
-//        // If the element is present at the middle
-//        // itself
-//		if (searched_value >= mid_left_value && searched_value <= mid_right_value ) // czy jest w sektorze srodkowym - jezeli tak, to koniec
-//		{
-//			return mid; // dobry sektor
-//		}
-
-//    	if (left_index == right_index) {
-//    		return -1;
-//    	}
-
-//        // If element is smaller than mid, then
-//        // it can only be present in left subarray
-//        if (mid_left_value > searched_value) // element jest mniejszsy niz srodkowy
-//        {
-//			uint16_t index = get_sector_number_from_calibration(left_index, mid - 1, ma730_value, offset); // szukaj z lewej strony
-//			return index;
-//        }
-
-//        // Else the element can only be present
-//        // in right subarray
-//        return get_sector_number_from_calibration(mid + 1, right_index, ma730_value, offset);  // szukaj z prawej strony
-//    }
-
-//    // We reach here when element is not
-//    // present in array
-//    return -1; // element poza sektorami
-//}
-// l - poczatek, r - koniec, x - szukane, arr - lista
-// l - lewy sektor, r - prawy sektor, x - ma730, o - offset
 int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset)
 {
     if (right_index >= left_index) {
@@ -528,7 +484,16 @@ void Update_Data_From_MC()
 	// POSITION
 	g_joint_status.f_current_motor_position = ((double) g_joint_status.mc_current_motor_position_multiturn / ENCODER_M1.PulseNumber) * M_TWOPI;
 	g_joint_status.f_current_joint_position_multiturn = (double) g_joint_status.f_current_motor_position / g_joint_configuration.gear_ratio + g_joint_status.f_current_encoder_position_offset;
-	g_joint_status.f_current_joint_position = fmod((double) g_joint_status.f_current_joint_position_multiturn + M_PI, (double) M_TWOPI) - M_PI;
+	if (g_joint_status.f_current_joint_position_multiturn > 0)
+	{
+		g_joint_status.f_current_joint_position = fmod((double) g_joint_status.f_current_joint_position_multiturn + M_PI, (double) M_TWOPI) - M_PI;
+	}
+	else
+	{
+		g_joint_status.f_current_joint_position = fmod((double) g_joint_status.f_current_joint_position_multiturn - M_PI, (double) M_TWOPI) + M_PI;
+	}
+//	g_joint_status.f_current_joint_position = fmod((double) g_joint_status.f_current_joint_position_multiturn + M_PI, (double) M_TWOPI) - M_PI;
+	//g_joint_status.f_current_joint_position = fmod((double) g_joint_status.f_current_joint_position_multiturn, (double) M_TWOPI);
 
 	// SPEED
 	float temp_speed = 0;
@@ -700,7 +665,7 @@ void FLASH_Configuration_Load()
 		g_joint_configuration.calibration_state = JOINT_CALIBRATED;
 
 	}
-	g_joint_configuration.joint_working_area = M_PI * 165.0 / 180.0;
+	g_joint_configuration.joint_working_area = M_PI * (180.0 - 7.655 - 1.0) / 180.0;
 
 }
 
@@ -967,7 +932,7 @@ float Calculate_ADC_to_Temperature(uint16_t adc_data, uint16_t beta, uint8_t ntc
 
 
 // FSM
-void FSM_START_Callback() 
+bool FSM_START_Callback() 
 {
 	HAL_TIM_Base_Stop_IT(&htim6); // Disable 10 kHz timer
 
@@ -990,14 +955,18 @@ void FSM_START_Callback()
 	// FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT);
 
 	HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
+	
+	return true;
 }
 
-void FSM_READY_TO_OPERATE_Callback() 
+bool FSM_READY_TO_OPERATE_Callback() 
 {
 	motor_stop();
+
+	return true;
 }
 
-void FSM_OPERATION_ENABLE_Callback() 
+bool FSM_OPERATION_ENABLE_Callback() 
 {
 	int16_t goal = 0;
 
@@ -1014,6 +983,15 @@ void FSM_OPERATION_ENABLE_Callback()
 			goal = g_joint_command._motor_speed;
 			break;
 		}
+
+		default:
+		{
+			goal = 0;
+			g_joint_command._motor_speed = 0;
+			g_joint_command._motor_torque = 0;
+			break;
+		}
+
 	}
 
 	if (g_joint_configuration.working_area_constrain_enabled)
@@ -1052,32 +1030,58 @@ void FSM_OPERATION_ENABLE_Callback()
 	{
 		motor_start(g_joint_command.working_mode, goal);
 	}
+
+	return true;
+	
 }
 
-void FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE_Callback()
+bool FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE_Callback()
 {
 	motor_stop();
+
+	return true;
 }
 
-void FSM_FAULT_REACTION_ACTIVE_Callback()
+bool FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE_Callback()
+{
+	motor_start(g_joint_command.working_mode, 0);
+	// sprawdzenie czy MC jest w RUN
+	if (	g_joint_status.stm_state_motor == RUN)
+		return true;	
+	else
+		return false;
+}
+
+bool FSM_FAULT_REACTION_ACTIVE_Callback()
 {
 	motor_stop();
+	g_counters.spi_tx_counter++;
+
+	return true;	
 }
 
-void FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback() 
+bool FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback() 
 {
 	motor_stop();
+
+	return true;	
 }
 
-void FSM_FAULT_Callback() 
+bool FSM_FAULT_Callback() 
 {
 	motor_stop();
+	g_counters.spi_txrx_counter++;
+
+	return true;
+	
 }
 
-void FSM_TRANSITION_FAULT_TO_INIT_Callback() 
+bool FSM_TRANSITION_FAULT_TO_INIT_Callback() 
 {
 	MC_AcknowledgeFaultMotor1();
 	g_joint_status.errors = 0;
+
+	return true;	
 }
 
 void FSM_Tick_Callback() 
@@ -1607,9 +1611,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if(htim->Instance == TIM6) 	// 10kHz (5,0) - fast recalculation
 	{
 		g_counters.timer6++;
-//		Read_MC_Encoder_10kHz();
 		Read_MC_Torque();
 	}
+
+//	if(htim->Instance == TIM2)
+//	{
+//		g_counters.spi_rx_counter++;
+//	}
 
 	if(htim->Instance == TIM7) 	// 1kHz - FSM_Tasks
 	{
@@ -1856,51 +1864,51 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 				break;
 			}
 
-			case 0x9: // Dane pozycjonujace
-			{
-				int32_t l_temp_1 = (int32_t) (g_temp_1 * (float) INT32_MAX);
-				int32_t l_temp_3 = (int32_t) (g_temp_3 * (float) INT32_MAX);
-				int32_t l_temp_4 = (int32_t) (g_temp_4 * (float) INT32_MAX);
+//			case 0x9: // Dane pozycjonujace
+//			{
+//				int32_t l_temp_1 = (int32_t) (g_temp_1 * (float) INT32_MAX);
+//				int32_t l_temp_3 = (int32_t) (g_temp_3 * (float) INT32_MAX);
+//				int32_t l_temp_4 = (int32_t) (g_temp_4 * (float) INT32_MAX);
 
-				can_tx_data[0] 	= l_temp_1 >> 24;
-				can_tx_data[1] 	= l_temp_1 >> 16;
-				can_tx_data[2] 	= l_temp_1 >> 8;
-				can_tx_data[3] 	= l_temp_1;
+//				can_tx_data[0] 	= l_temp_1 >> 24;
+//				can_tx_data[1] 	= l_temp_1 >> 16;
+//				can_tx_data[2] 	= l_temp_1 >> 8;
+//				can_tx_data[3] 	= l_temp_1;
 
-				can_tx_data[4] 	= g_temp_2 >> 8;
-				can_tx_data[5] 	= g_temp_2;
+//				can_tx_data[4] 	= g_temp_2 >> 8;
+//				can_tx_data[5] 	= g_temp_2;
 
-				can_tx_data[6] 	= l_temp_3 >> 24;
-				can_tx_data[7] 	= l_temp_3 >> 16;
-				can_tx_data[8] 	= l_temp_3 >> 8;
-				can_tx_data[9] 	= l_temp_3;
+//				can_tx_data[6] 	= l_temp_3 >> 24;
+//				can_tx_data[7] 	= l_temp_3 >> 16;
+//				can_tx_data[8] 	= l_temp_3 >> 8;
+//				can_tx_data[9] 	= l_temp_3;
 
-				can_tx_data[10] = l_temp_4 >> 24;
-				can_tx_data[11] = l_temp_4 >> 16;
-				can_tx_data[12] = l_temp_4 >> 8;
-				can_tx_data[13] = l_temp_4;
+//				can_tx_data[10] = l_temp_4 >> 24;
+//				can_tx_data[11] = l_temp_4 >> 16;
+//				can_tx_data[12] = l_temp_4 >> 8;
+//				can_tx_data[13] = l_temp_4;
 
-				can_tx_data[14] = g_temp_5 >> 8;
-				can_tx_data[15] = g_temp_5;
+//				can_tx_data[14] = g_temp_5 >> 8;
+//				can_tx_data[15] = g_temp_5;
 
-				can_tx_data[16] = g_temp_6 >> 8;
-				can_tx_data[17] = g_temp_6;
+//				can_tx_data[16] = g_temp_6 >> 8;
+//				can_tx_data[17] = g_temp_6;
 
-				can_tx_data[18] = g_temp_7 >> 8;
-				can_tx_data[19] = g_temp_7;
+//				can_tx_data[18] = g_temp_7 >> 8;
+//				can_tx_data[19] = g_temp_7;
 
-//				dlugosc_danych_polecenia = 1;
-//				// uint8_t - FSM
-//				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
-//
-//				FSM_Set_State(can_rx_data[offset]);
-//
-//				can_tx_data[0] = FSM_Get_State();
-//
-//				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
-				can_tx_header.DataLength = FDCAN_DLC_BYTES_20;
-				break;
-			}
+////				dlugosc_danych_polecenia = 1;
+////				// uint8_t - FSM
+////				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
+////
+////				FSM_Set_State(can_rx_data[offset]);
+////
+////				can_tx_data[0] = FSM_Get_State();
+////
+////				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
+//				can_tx_header.DataLength = FDCAN_DLC_BYTES_20;
+//				break;
+//			}
 
 			case 0xA: // RESET
 			{
@@ -2063,6 +2071,8 @@ uint16_t NTC_CalcAvTemp( NTC_Handle_t * pHandle )
   return ( pHandle->hFaultState );
 }
 
+//#if SDK_VERSION == 0x055a0300
+
 int32_t MCM_Sqrt( int32_t wInput ) 
 {
 	 int32_t wtemprootnew;
@@ -2104,3 +2114,4 @@ int32_t MCM_Sqrt( int32_t wInput )
 
 		  return ( wtemprootnew );
 }
+//#endif

@@ -3,8 +3,8 @@
  * Auto generated Run-Time-Environment Configuration File
  *      *** Do not modify ! ***
  *
- * Project: 'universal_joint_3.2_MC5Y3_RI70' 
- * Target:  'universal_joint_3.2_MC5Y3_RI70' 
+ * Project: 'universal_joint_3.2_MC5Y3_RI80' 
+ * Target:  'universal_joint_3_2_MC5Y3_RI80' 
  */
 
 #ifndef RTE_COMPONENTS_H

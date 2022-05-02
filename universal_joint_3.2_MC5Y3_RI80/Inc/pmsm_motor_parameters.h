@@ -41,10 +41,10 @@
                                    *Amplifying network gain)/(MCU supply voltage/2)
 */
 
-#define NOMINAL_CURRENT         18195
+#define NOMINAL_CURRENT         21325
 #define MOTOR_MAX_SPEED_RPM     2424 /*!< Maximum rated speed  */
 #define MOTOR_VOLTAGE_CONSTANT  14.7 /*!< Volts RMS ph-ph /kRPM */
-#define ID_DEMAG                -18195 /*!< Demagnetization current */
+#define ID_DEMAG                -21325 /*!< Demagnetization current */
 /***************** MOTOR SENSORS PARAMETERS  ******************************/
 /* Motor sensors parameters are always generated but really meaningful only
    if the corresponding sensor is actually present in the motor         */

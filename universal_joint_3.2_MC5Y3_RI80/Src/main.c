@@ -68,6 +68,7 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 extern Counters_Handle_t volatile g_counters;
+uint8_t g_reg_80;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -175,7 +176,7 @@ int main(void)
 ////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0xA, 1, &g_reg_A, sizeof(g_reg_1), HAL_MAX_DELAY);
 ////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0xB, 1, &g_reg_B, sizeof(g_reg_1), HAL_MAX_DELAY);
 ////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0XC, 1, &g_reg_C, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0x80, 1, &g_reg_80, sizeof(g_reg_1), 100);
+//	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0x80, 1, &g_reg_80, sizeof(g_reg_80), 100);
 //
 ////	  	HAL_I2C_Mem_Read_IT(&hi2c3, 0b10001110, 0x80, 1, &g_reg_80, sizeof(g_reg_1));
 //
@@ -1117,7 +1118,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 1);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 6, 1);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }

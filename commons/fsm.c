@@ -50,52 +50,71 @@ __attribute__((weak)) bool FSM_Set_State_Callback(uint8_t new_state)
 	return false;
 }
 
-__attribute__((weak)) void FSM_START_Callback() 
+__attribute__((weak)) bool FSM_START_Callback() 
 {
+	return true;
 }
 
-__attribute__((weak)) void FSM_INIT_Callback() 
+__attribute__((weak)) bool FSM_INIT_Callback() 
 {
+	return true;
 }
 
-__attribute__((weak)) void FSM_READY_TO_OPERATE_Callback() 
+__attribute__((weak)) bool FSM_READY_TO_OPERATE_Callback() 
 {
+	return true;
 }
 
-__attribute__((weak)) void FSM_OPERATION_ENABLE_Callback() 
+__attribute__((weak)) bool FSM_OPERATION_ENABLE_Callback() 
 {
+	return true;
 }
 
-__attribute__((weak)) void FSM_FAULT_REACTION_ACTIVE_Callback() 
+__attribute__((weak)) bool FSM_FAULT_REACTION_ACTIVE_Callback() 
 {
+	return true;
 }
 
-__attribute__((weak)) void FSM_FAULT_Callback() 
+__attribute__((weak)) bool FSM_FAULT_Callback() 
 {
+	return true;
 }
 
-__attribute__((weak)) void FSM_TRANSITION_START_TO_INIT_Callback() 
+__attribute__((weak)) bool FSM_TRANSITION_START_TO_INIT_Callback() 
 {
+	return true;
 }
 
-__attribute__((weak)) void FSM_TRANSITION_INIT_TO_READY_TO_OPERATE_Callback() 
+__attribute__((weak)) bool FSM_TRANSITION_INIT_TO_READY_TO_OPERATE_Callback() 
 {
+	return true;
 }
-__attribute__((weak)) void FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE_Callback() 
+
+__attribute__((weak)) bool FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE_Callback() 
 {
+	return true;
 }
-__attribute__((weak)) void FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE_Callback() 
+
+__attribute__((weak)) bool FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE_Callback() 
 {
+	return true;
 }
-__attribute__((weak)) void FSM_TRANSITION_OPERATION_ENABLE_TO_INIT_Callback() 
+
+__attribute__((weak)) bool FSM_TRANSITION_OPERATION_ENABLE_TO_INIT_Callback() 
 {
+	return true;
 }
-__attribute__((weak)) void FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback() 
+
+__attribute__((weak)) bool FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback() 
 {
+	return true;
 }
-__attribute__((weak)) void FSM_TRANSITION_FAULT_TO_INIT_Callback() 
+
+__attribute__((weak)) bool FSM_TRANSITION_FAULT_TO_INIT_Callback() 
 {
+	return true;
 }
+
 __attribute__((weak)) void FSM_Tick_Callback() 
 {
 	// FSM
@@ -204,7 +223,7 @@ void FSM_Tick()
 	switch (FSM_Get_State()) {
 
 		case FSM_START:
-			FSM_START_Callback();
+			FSM_START_Callback(); 
 			FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT); // auto
 			break;
 
@@ -230,39 +249,39 @@ void FSM_Tick()
 			break;
 
 		case FSM_TRANSITION_START_TO_INIT:
-			FSM_TRANSITION_START_TO_INIT_Callback();
-			FSM_Activate_State(FSM_INIT);
+			if (FSM_TRANSITION_START_TO_INIT_Callback())
+				FSM_Activate_State(FSM_INIT);
 			break;
 
 		case FSM_TRANSITION_INIT_TO_READY_TO_OPERATE:
-			FSM_TRANSITION_INIT_TO_READY_TO_OPERATE_Callback();
-			FSM_Activate_State(FSM_READY_TO_OPERATE);
+			if (FSM_TRANSITION_INIT_TO_READY_TO_OPERATE_Callback())
+				FSM_Activate_State(FSM_READY_TO_OPERATE);
 			break;
 
 		case FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE:
-			FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE_Callback();
-			FSM_Activate_State(FSM_OPERATION_ENABLE);
+			if (FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE_Callback()) // zadanie sie skonczylo
+				FSM_Activate_State(FSM_OPERATION_ENABLE);
 			break;
 
 		case FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE:
-			FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE_Callback();
-			FSM_Activate_State(FSM_READY_TO_OPERATE);
+			if (FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE_Callback()) // zadanie sie skonczylo
+				FSM_Activate_State(FSM_READY_TO_OPERATE);
 			//motor_stop();
 			break;
 
 		case FSM_TRANSITION_OPERATION_ENABLE_TO_INIT:
-			FSM_TRANSITION_OPERATION_ENABLE_TO_INIT_Callback();
-			FSM_Activate_State(FSM_INIT);
+			if (FSM_TRANSITION_OPERATION_ENABLE_TO_INIT_Callback()) // zadanie sie skonczylo
+				FSM_Activate_State(FSM_INIT);
 			break;
 
 		case FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT:
-			FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback();
-			FSM_Activate_State(FSM_FAULT);
+			if (FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback()) // zadanie sie skonczylo
+				FSM_Activate_State(FSM_FAULT);
 			break;
 		
 		case FSM_TRANSITION_FAULT_TO_INIT:
-			FSM_TRANSITION_FAULT_TO_INIT_Callback();
-			FSM_Activate_State(FSM_INIT);
+			if (FSM_TRANSITION_FAULT_TO_INIT_Callback()) // zadanie sie skonczylo
+				FSM_Activate_State(FSM_INIT);
 			break;
 
 		default:

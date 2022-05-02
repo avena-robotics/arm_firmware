@@ -7,6 +7,7 @@ extern "C" {
 #endif
 
 #include <main.h>
+#include "mc_configuration_registers.h"
 
 #define GEAR_RATIO												(uint16_t) 121
 #define JOINT_SPEED_LIMIT									(float) 1.5
@@ -147,9 +148,9 @@ typedef struct App_Command_Handle {
 } __attribute__ ((packed)) App_Command_Handle_t;
 
 typedef enum Joint_Position_State {
-	POSITION_UNDER_WORKING_AREA = -1,
 	POSITION_IN_WORKING_AREA = 0, /**< @brief Starting uC.*/
-	POSITION_OVER_WORKING_AREA = 1
+	POSITION_OVER_WORKING_AREA = 1,
+	POSITION_UNDER_WORKING_AREA = 2,
 } Joint_Position_State_t;
 
 typedef enum Encoder_Position_State {
@@ -195,7 +196,12 @@ typedef struct Joint_Status_Handle {
 
 //	PosCtrlStatus_t mc_position_control_status;
 //	AlignStatus_t mc_encoder_align_status;
+#if SDK_VERSION == 0x055a0300
 	State_t stm_state_motor;
+#elif SDK_VERSION == 0x055a0400
+	MCI_State_t stm_state_motor;
+#endif
+
 	uint8_t mc_current_faults_motor;
 	uint8_t mc_occured_faults_motor;
 
@@ -230,6 +236,8 @@ typedef struct Joint_Status_Handle {
 
 // FUNCTION DEFINITION
 void UJ_Init(void);
+// void FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback(void);
+void motor_stop(void);
 
 // EXTERN VARIABLES
 extern volatile int16_t g_current_electrical_rotation;

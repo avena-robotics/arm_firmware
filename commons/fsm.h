@@ -43,6 +43,9 @@ bool FSM_Activate_Transition(uint8_t new_transition);
 bool FSM_Set_State_Callback(uint8_t new_state);
 void FSM_Tick_Callback(void);
 
+// void FSM_FAULT_REACTION_ACTIVE_Callback(void) __attribute__((weak));
+// void FSM_FAULT_Callback(void) __attribute__((weak));
+
 // EXTERN VARIABLES
 
 #ifdef __cplusplus
