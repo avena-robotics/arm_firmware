@@ -104,7 +104,7 @@ typedef enum
 #define PRIM_SENSOR_M1  eENCODER
 #define AUX_SENSOR_M1  eNO_SENSOR
 #define TOPOLOGY_M1 0
-#define FOC_RATE_M1 1
+#define FOC_RATE_M1 3
 #define PWM_FREQ_M1 30000
 
 extern const char FIRMWARE_NAME[];

@@ -22,7 +22,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "math.h"
 #include "commons_uj.h"
 
 /* USER CODE END Includes */
@@ -1091,7 +1090,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 1);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 6, 1);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }

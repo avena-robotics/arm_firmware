@@ -67,14 +67,14 @@
                                                            signals are enabled */
 
 /* Torque and flux regulation loops */
-#define REGULATION_EXECUTION_RATE     1    /*!< FOC execution rate in
+#define REGULATION_EXECUTION_RATE     3    /*!< FOC execution rate in
                                                            number of PWM cycles */
 /* Gains values for torque and flux control loops */
 #define PID_TORQUE_KP_DEFAULT         2443
-#define PID_TORQUE_KI_DEFAULT         77
+#define PID_TORQUE_KI_DEFAULT         231
 #define PID_TORQUE_KD_DEFAULT         100
 #define PID_FLUX_KP_DEFAULT           2443
-#define PID_FLUX_KI_DEFAULT           77
+#define PID_FLUX_KI_DEFAULT           231
 #define PID_FLUX_KD_DEFAULT           100
 
 /* Torque/Flux control loop gains dividers*/
