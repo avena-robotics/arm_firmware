@@ -127,6 +127,7 @@ void Error_Handler(void);
 #define POLE_PAIRS							(uint16_t) 7
 #define SECTOR_SIZE							(uint16_t) 7
 #define MOTOR_TYPE							RI80
+#define PCB_VERSION 						0x030200
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

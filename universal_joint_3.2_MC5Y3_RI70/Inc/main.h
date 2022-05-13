@@ -62,7 +62,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define SEC_IN_Pin GPIO_PIN_14
 #define SEC_IN_GPIO_Port GPIOC
-#define SEC_IN_EXTI_IRQn EXTI15_10_IRQn
 #define SEC_OUT_Pin GPIO_PIN_15
 #define SEC_OUT_GPIO_Port GPIOC
 #define MA730_CS_Pin GPIO_PIN_3
@@ -127,7 +126,7 @@ void Error_Handler(void);
 #define POLE_PAIRS					(uint16_t) 14
 #define SECTOR_SIZE					(uint16_t) 14
 #define MOTOR_TYPE					RI70
-
+#define PCB_VERSION 				0x030200
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -82,8 +82,8 @@
           <AfterMake>
             <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name>fromelf.exe --bin universal_joint_3.2_MC5Y3_RI80\universal_joint_3_2_MC5Y3_RI80.axf --output universal_joint_3_2_MC3Y3_RI80.bin</UserProg1Name>
-            <UserProg2Name></UserProg2Name>
+            <UserProg1Name>"./UserCommandRunAfterCompile.bat"</UserProg1Name>
+            <UserProg2Name>fromelf.exe --bin universal_joint_3.2_MC5Y3_RI80\universal_joint_3_2_MC5Y3_RI80.axf --output universal_joint_3_2_MC3Y3_RI80.bin</UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
             <nStopA1X>0</nStopA1X>
@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>ARM_MATH_CM4,USE_HAL_DRIVER,STM32G431xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc; ../Drivers/STM32G4xx_HAL_Driver/Inc; ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy; ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/G4xx/Inc; ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/Any/Inc; ../Drivers/CMSIS/Device/ST/STM32G4xx/Include; ../Drivers/CMSIS/Include; ../Drivers/CMSIS/DSP/Include; ../../commons</IncludePath>
+              <IncludePath>../Inc;  ../Drivers/STM32G4xx_HAL_Driver/Inc;  ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;  ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/G4xx/Inc;  ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/Any/Inc;  ../Drivers/CMSIS/Device/ST/STM32G4xx/Include;  ../Drivers/CMSIS/Include;  ../Drivers/CMSIS/DSP/Include;  ../../commons</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>

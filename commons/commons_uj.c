@@ -5,6 +5,7 @@
 //#pragma GCC optimize ("O0")
 
 // SDK_VERSION
+// 5.4.7 // 0x05040700
 // 5.Y.3 // 0x055a0300
 // 5.Y.4 // 0x055a0400
 
@@ -14,12 +15,15 @@ FDCAN_TxHeaderTypeDef can_tx_header; // CAN Bus Transmit Header
 uint8_t can_rx_data[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};  //CAN Bus Receive Buffer
 uint8_t can_tx_data[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};  //CAN Bus Send Buffer
 
-uint16_t g_spi_rx_data    = 0x0000 ;
-uint16_t g_spi_tx_data    = 0x0000 ;
+volatile uint16_t g_spi_rx_data    	= 0x0000 ;
+volatile uint16_t g_spi_tx_data    	= 0x0000 ;
+volatile bool     g_spi_finished 		= false;
 
 // FLASH
+// 0x018000 -  98304 (32kB z tylu na konfiguracje)
 uint32_t g_flash_address_configuration 			= 0x08018000;
 uint32_t g_flash_address_calibration_table 	= 0x08018100;
+
 uint16_t g_calibration_config[20] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint32_t g_data[2] = {0, 0};
 
@@ -28,14 +32,6 @@ float g_diff_zero_electric_position;
 float g_diff_current_electric_position;
 float g_electric_offset_to_zero_in_rad;
 float g_encoder_offset_to_current_in_rad;
-
-// float g_temp_1;
-//int16_t g_temp_2;
-//float g_temp_3;
-//float g_temp_4;
-//int16_t g_temp_5;
-//int16_t g_temp_6;
-//uint16_t g_temp_7;
 
 uint16_t g_mgh_errors = 0;
 uint16_t g_mgl_errors = 0;
@@ -72,31 +68,31 @@ Counters_Handle_t volatile g_counters = {
 };
 
 
-App_Command_Handle_t g_joint_command = {
+Joint_Command_Handle_t g_joint_command = {
 	.working_mode = TORQUE_MODE,
 	.motor_torque = 0.0,
 };
 
-
-
-
-Joint_Configuration_Handle_t g_joint_configuration = {
+volatile Joint_Configuration_Handle_t g_joint_configuration = {
 	.ma730_enabled = false,
+	.pz2656_enabled = false,
 	.safety_enabled = false,
 	.working_area_constrain_enabled = false,
 	.motor_type = MOTOR_TYPE,
 	.can_node_id = 0x00,
-	.gear_ratio = 121
+	.gear_ratio = 121,
 };
 
 
 Joint_Status_Handle_t g_joint_status = {
 	.mc_current_motor_position = 0,
-	.encoder_position_state = POSITION_UNKNOWN
+	.encoder_position_state = POSITION_UNKNOWN,
+	.b_safety_input = true,
 };
 
 volatile MA730_Handle_t	g_ma730 = {
-	.started = false
+	.started = false,
+	.angle = 0x00,
 };
 
 volatile FSMStatus_t 	g_fsm_status = {
@@ -130,29 +126,30 @@ void MA730_ReadRegister(uint8_t reg_number);
 void MA730_ReadAngle(void);
 void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value);
 void motor_stop(void);
+uint16_t NTC_SetFaultState(NTC_Handle_t * pHandle);
+void pz_spi_transfer(uint8_t *data_tx, uint8_t *data_rx, uint16_t datasize);
 
 // FUNCTIONS BODIES
 void UJ_Init() {
-	NTC_Init(&g_TempBearingSensorParamsM1);
+//	NTC_Init(&g_TempBearingSensorParamsM1);
 
-	MA730_WriteRegister(0, 0b00000000);
-	MA730_WriteRegister(1, 0b00000000);
-//	MA730_WriteRegister(2, 0b00000000);
-	MA730_WriteRegister(2, 0b10010000); // BCT=144
-	MA730_WriteRegister(3, 0b00000000); // ETX=0, ETY=0
-	MA730_WriteRegister(4, 0b11000000);
-	MA730_WriteRegister(5, 0b11111111);
-	MA730_WriteRegister(6, 0b00011100);
-	MA730_WriteRegister(9, 0b00000000);
+//	MA730_WriteRegister(0, 0b00000000);
+//	MA730_WriteRegister(1, 0b00000000);
+//	MA730_WriteRegister(2, 0b10010000); // BCT=144
+//	MA730_WriteRegister(3, 0b00000000); // ETX=0, ETY=0
+//	MA730_WriteRegister(4, 0b11000000);
+//	MA730_WriteRegister(5, 0b11111111);
+//	MA730_WriteRegister(6, 0b00011100);
+//	MA730_WriteRegister(9, 0b00000000);
 
-	MA730_ReadRegister(0);
-	MA730_ReadRegister(1);
-	MA730_ReadRegister(2);
-	MA730_ReadRegister(3);
-	MA730_ReadRegister(4);
-	MA730_ReadRegister(5);
-	MA730_ReadRegister(6);
-	MA730_ReadRegister(9);
+//	MA730_ReadRegister(0);
+//	MA730_ReadRegister(1);
+//	MA730_ReadRegister(2);
+//	MA730_ReadRegister(3);
+//	MA730_ReadRegister(4);
+//	MA730_ReadRegister(5);
+//	MA730_ReadRegister(6);
+//	MA730_ReadRegister(9);
 
 	// TIMERS
 	HAL_TIM_Base_Start_IT(&htim6); 	// Enable 10 kHz timer for fast calculation
@@ -169,42 +166,25 @@ void motor_start(Working_Mode_t mode, int16_t goal)
 	switch (g_joint_command.working_mode)
 	{
 		case TORQUE_MODE:
-		{
 			g_joint_command._motor_torque = goal;
 			MC_ProgramTorqueRampMotor1(g_joint_command._motor_torque, 0);
 			MC_StartMotor1();
 			break;
-		}
 
 		case SPEED_MODE:
-		{
 			g_joint_command._motor_speed = goal;
 			MC_ProgramSpeedRampMotor1(g_joint_command._motor_speed, 0);
 			MC_StartMotor1();
 			break;
-		}
-
-//			case POSITION_MODE:
-//			{
-//				MC_ProgramPositionCommandMotor1(g_joint_command.motor_position, 0.1);
-////				MC_ProgramSpeedRampMotor1(g_joint_command._motor_position, 0);
-////				MC_StartMotor1();
-////				MC_ProgramPositionCommandMotor1(g_joint_command.joint_position, 0.1);
-////				MC_StartMotor1();
-////				HAL_Delay(2000);
-//				break;
-//			}
 
 		default:
-		{
 			motor_stop();
-		}
+			break;
 	}
 }
 
 void motor_stop() 
 {
-
 	if (g_joint_status.stm_state_motor == RUN)
 	{
 		// clear torque readings
@@ -274,102 +254,105 @@ bool check_calibration_data_ccw(int16_t size)
 }
 
 
-int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset)
+int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset, uint16_t count)
 {
-    if (right_index >= left_index) {
-    	int16_t mid = left_index + (right_index - left_index) / 2; // srodek
+	if (left_index == 0 && right_index == 65535)
+	{
+		return -1;
+	}
+	
+	if (count > 9)
+	{
+		return -1;
+	}
+		
+	if (right_index >= left_index) 
+	{
 
-    	uint32_t mid_left_value  = g_joint_configuration.calibration_table_1[mid];    // wartosc lewego brzegu sektora
-    	uint32_t mid_right_value = g_joint_configuration.calibration_table_2[mid];    // wartosc prawego brzegu sektora
-    	uint32_t searched_value  = ma730_value; // wartosc szukana
+		volatile int16_t mid = left_index + (right_index - left_index) / 2; // srodek
 
-    	// Przesuniecie wartosci o offset, by funkcja byla w calej dlugosci ciagla
-    	if (mid_left_value <= offset)
-    	{
-    		mid_left_value += 16384;
-    	}
+		volatile uint32_t mid_left_value  = g_joint_configuration.calibration_table_1[mid];    // wartosc lewego brzegu sektora
+		volatile uint32_t mid_right_value = g_joint_configuration.calibration_table_2[mid];    // wartosc prawego brzegu sektora
+		volatile uint32_t searched_value  = ma730_value; // wartosc szukana
 
-    	if (mid_right_value <= offset)
-    	{
-    		mid_right_value += 16384;
-    	}
+		volatile uint16_t _count = ++count;
 
-    	if (searched_value <= offset)
-    	{
-    		searched_value += 16384;
-    	}
+		// Przesuniecie wartosci o offset, by funkcja byla w calej dlugosci ciagla
+		if (mid_left_value <= offset)
+		{
+			mid_left_value += 16384;
+		}
 
-        // If the element is present at the middle
-        // itself
+		if (mid_right_value <= offset)
+		{
+			mid_right_value += 16384;
+		}
+
+		if (searched_value <= offset)
+		{
+			searched_value += 16384;
+		}
+
+		// If the element is present at the middle
+		// itself
 		if (searched_value >= mid_left_value && searched_value <= mid_right_value ) // czy jest w sektorze srodkowym - jezeli tak, to koniec
 		{
 			return mid; // dobry sektor
 		}
 
-    	if (left_index == right_index) {
-    		return -1;
-    	}
+		if (left_index == right_index) {
+			return -1;
+		}
 
-        // If element is smaller than mid, then
-        // it can only be present in left subarray
-        if (mid_left_value > searched_value) // element jest mniejszsy niz srodkowy
-        {
-			uint16_t index = get_sector_number_from_calibration(left_index, mid - 1, ma730_value, offset); // szukaj z lewej strony
+		// If element is smaller than mid, then
+		// it can only be present in left subarray
+		if (mid_left_value > searched_value) // element jest mniejszsy niz srodkowy
+		{
+			volatile uint16_t index = get_sector_number_from_calibration(left_index, mid, ma730_value, offset, _count); // szukaj z lewej strony
 			return index;
-        }
+		}
 
-        // Else the element can only be present
-        // in right subarray
-        return get_sector_number_from_calibration(mid + 1, right_index, ma730_value, offset);  // szukaj z prawej strony
-    }
+		// Else the element can only be present
+		// in right subarray
+		volatile uint16_t index = get_sector_number_from_calibration(mid, right_index, ma730_value, offset, _count);  // szukaj z prawej strony
+		return index;
+	}
 
-    // We reach here when element is not
-    // present in array
-    return -1; // element poza sektorami
+	// We reach here when element is not
+	// present in array
+	return -1; // element poza sektorami
 }
+
 int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset, bool ccw) 
 {
-    if (right_index >= left_index)
-    {
-    	int16_t mid = left_index + (right_index - left_index) / 2; // srodek zakresu tablicy
+	if (right_index >= left_index)
+	{
+		int16_t mid = left_index + (right_index - left_index) / 2; // srodek zakresu tablicy
 
-    	uint32_t right_index_value = g_joint_configuration.calibration_table_1[mid - 1];
-    	uint32_t mid_index_value   = g_joint_configuration.calibration_table_1[mid];
-    	uint32_t left_index_value  = g_joint_configuration.calibration_table_1[mid + 1];
-//    	uint32_t mid_left_value  = g_joint_configuration.calibration_table_1[mid + 1]; // wartosc lewego brzegu sektora
-////    	uint32_t mid_right_value = g_joint_configuration.calibration_table_2[mid];     // wartosc prawego brzegu sektora
-//		uint32_t mid_right_value = g_joint_configuration.calibration_table_1[mid];     // wartosc prawego brzegu sektora
-    	uint32_t searched_value    = ma730_value; // wartosc szukana
+		uint32_t right_index_value = g_joint_configuration.calibration_table_1[mid - 1];
+		uint32_t mid_index_value   = g_joint_configuration.calibration_table_1[mid];
+		uint32_t left_index_value  = g_joint_configuration.calibration_table_1[mid + 1];
+		uint32_t searched_value    = ma730_value; // wartosc szukana
 
-    	// Przesuniecie wartosci o offset, by funkcja byla w calej dlugosci ciagla
-//    	if (mid_left_value <= offset)
-//    	{
-//    		mid_left_value += 16384;
-//    	}
-//
-//    	if (mid_right_value <= offset)
-//    	{
-//    		mid_right_value += 16384;
-//    	}
+		// Przesuniecie wartosci o offset, by funkcja byla w calej dlugosci ciagla
+		if (right_index_value <= offset)
+		{
+			right_index_value += 16384;
+		}
+		if (left_index_value <= offset)
+		{
+			left_index_value += 16384;
+		}
+		if (mid_index_value <= offset)
+		{
+			mid_index_value += 16384;
+		}
+		if (searched_value <= offset)
+		{
+			searched_value += 16384;
+		}
 
-    	if (right_index_value <= offset)
-    	{
-    		right_index_value += 16384;
-    	}
-    	if (left_index_value <= offset)
-    	{
-    		left_index_value += 16384;
-    	}
-    	if (mid_index_value <= offset)
-    	{
-    		mid_index_value += 16384;
-    	}
-    	if (searched_value <= offset)
-    	{
-    		searched_value += 16384;
-    	}
-
-    	// ZNALAZLEM
+		// ZNALAZLEM
 		if (searched_value >= right_index_value && searched_value <= left_index_value) // czy jest w sektorze srodkowym - jezeli tak, to koniec
 		{
 			if (searched_value >= mid_index_value && searched_value <= left_index_value)
@@ -393,35 +376,34 @@ int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t
 				{
 					return mid - 1;
 				}
-
 			}
 			// Ustalenie blizej ktorej z 3 wartosci znajduje sie
 			return mid; // dobry sektor
 		}
 
-    	if (left_index == right_index)
-    	{
-    		return -1;
-    	}
+		if (left_index == right_index)
+		{
+			return -1;
+		}
 
-        // If element is smaller than mid, then
-        // it can only be present in left subarray
-    	// SZUKAM Z LEWEJ
-        if (mid_index_value > searched_value) // element jest mniejszsy niz srodkowy
-        {
+		// If element is smaller than mid, then
+		// it can only be present in left subarray
+		// SZUKAM Z LEWEJ
+		if (mid_index_value > searched_value) // element jest mniejszsy niz srodkowy
+		{
 			uint16_t index = get_rotation_number_from_calibration_table(left_index, mid - 1, ma730_value, offset, ccw); // szukaj z lewej strony
 			return index;
-        }
+		}
 
-        // Else the element can only be present
-        // in right subarray
-        // SZUKAM Z PRAWEJ
-        return get_rotation_number_from_calibration_table(mid + 1, right_index, ma730_value, offset, ccw);  // szukaj z prawej strony
-    }
+		// Else the element can only be present
+		// in right subarray
+		// SZUKAM Z PRAWEJ
+		return get_rotation_number_from_calibration_table(mid + 1, right_index, ma730_value, offset, ccw);  // szukaj z prawej strony
+	}
 
-    // We reach here when element is not
-    // present in array
-    return -1; // element poza sektorami
+	// We reach here when element is not
+	// present in array
+	return -1; // element poza sektorami
 }
 
 void Read_MC_Encoder_1kHz() 
@@ -471,12 +453,20 @@ void Read_MC_State()
 	g_joint_status.mc_occured_faults_motor 		= (uint8_t) MC_GetOccurredFaultsMotor1();
 //	g_joint_status.mc_encoder_align_status  	= MC_GetAlignmentStatusMotor1();
 //	g_joint_status.mc_position_control_status 	= MC_GetControlPositionStatusMotor1();
-	g_joint_status.current_motor_temperature 	= NTC_GetAvTemp_C(&TempSensor_M1);
+	
+//#if SDK_VERSION >= 0x055a0000
+	g_joint_status.current_motor_temperature 		= NTC_GetAvTemp_C(&TempSensor_M1);
 	g_joint_status.current_bearing_temperature 	= NTC_GetAvTemp_C(&g_TempBearingSensorParamsM1);
+//#else
+//	g_joint_status.current_motor_temperature 		= 25;
+//	g_joint_status.current_bearing_temperature 	= 25;
+//#endif
 
+
+#if PCB_VERSION >= 0x030000
 	g_joint_status.gd_nfault = (HAL_GPIO_ReadPin(GPIOE, GD_NFAULT_Pin) == GPIO_PIN_RESET) ? (0) : (1);
 	g_joint_status.gd_ready = (HAL_GPIO_ReadPin(GPIOE, GD_READY_Pin) == GPIO_PIN_RESET) ? (0) : (1);
-
+#endif
 }
 
 void Update_Data_From_MC() 
@@ -541,10 +531,12 @@ void CheckErrorsAndWarnings()
 	}
 
 	// HARDWARE ERROR REACTION
+	#if PCB_VERSION >= 0x030000
 	if (g_joint_status.gd_nfault == 0 && FSM_Get_State() != FSM_TRANSITION_FAULT_TO_INIT) {
 		g_joint_status.errors =  g_joint_status.errors | JOINT_HW_ERROR;
 		error = true;
 	}
+	#endif
 
 	// WARNINGS:
 	// WORKING AREA
@@ -568,11 +560,20 @@ void CheckErrorsAndWarnings()
 	if (g_joint_status.encoder_position_state != POSITION_ACCURATE)
 	{
 		g_joint_status.warnings = g_joint_status.warnings | JOINT_POSITION_NOT_ACCURATE;
-
 	}
 	else
 	{
 		g_joint_status.warnings = g_joint_status.warnings & (0xFF ^ JOINT_POSITION_NOT_ACCURATE);
+	}
+
+	// SAFETY
+	if (g_joint_status.b_safety_input == 0)
+	{
+		g_joint_status.warnings = g_joint_status.warnings | JOINT_SAFETY;
+	}
+	else
+	{
+		g_joint_status.warnings = g_joint_status.warnings & (0xFF ^ JOINT_SAFETY);
 	}
 
 	if (error == true && FSM_Get_State() != FSM_FAULT && FSM_Get_State() != FSM_FAULT_REACTION_ACTIVE && FSM_Get_State() != FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT)
@@ -589,7 +590,6 @@ void CheckErrorsAndWarnings()
 		g_joint_status.warnings = g_joint_status.warnings & (0xFF ^ JOINT_MA730_NOT_PROPER_MAGNETOC_FIELD);
 
 	}
-
 }
 
 // CAN FD
@@ -666,7 +666,6 @@ void FLASH_Configuration_Load()
 
 	}
 	g_joint_configuration.joint_working_area = M_PI * (180.0 - 7.655 - 1.0) / 180.0;
-
 }
 
 uint32_t FLASH_Configuration_Save() 
@@ -737,181 +736,12 @@ uint32_t FLASH_Configuration_Save()
 	HAL_FLASH_Lock();
 
 	return error;
-
 }
-
-// MA730
-void MA730_ReadRegister(uint8_t reg_number) 
-{
-	uint16_t send_data      = 0b010 << 13 | (reg_number & (0b00011111)) << 8 ;
-
-	uint16_t angle_value    = 0;
-	uint16_t register_value = 0;
-
-	for (uint16_t i = 0; i < 24; i++) __NOP();  // wait about 150ns
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
-
-	for (uint16_t i = 0; i < 130; i++) __NOP();  // wait about 80ns
-
-	// SEND READ REGISTER COMMAND - RECEIVE READ ANGLE RESULT
-	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
-
-	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
-
-	for (uint16_t i = 0; i < 13; i++) __NOP();  // wait about 80ns
-
-	send_data      = 0x0000;
-
-	// SEND READ ANGLE COMMAND - RECEIVE READ REGISTER RESULT
-	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &register_value, 1, 1);
-
-//	g_MA730_read_buffer = register_value >> 8;
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
-
-	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
-
-	g_ma730.angle = (angle_value >> 2) & 0b0011111111111111;
-
-	register_value = register_value >> 8;
-	switch (reg_number)
-	{
-		case 0x00:
-		{
-			g_ma730.z0 = (uint8_t) register_value;
-			break;
-		}
-		case 0x01:
-		{
-			g_ma730.z1 = (uint8_t) register_value;
-			break;
-		}
-		case 0x02:
-		{
-			g_ma730.bct = (uint8_t) register_value;
-			break;
-		}
-		case 0x03:
-		{
-			g_ma730.ety = ((uint8_t) register_value & 0b00000010) >> 1;
-			g_ma730.etx = ((uint8_t) register_value & 0b00000001);
-			break;
-		}
-		case 0x04:
-		{
-			g_ma730.ppt0 = ((uint8_t) register_value & 0b11000000) >> 6;
-			g_ma730.ilip = ((uint8_t) register_value & 0b00111100) >> 2;
-			break;
-		}
-		case 0x05:
-		{
-			g_ma730.ppt1 = (uint8_t) register_value;
-			break;
-		}
-		case 0x06:
-		{
-			g_ma730.mglt = ((uint8_t) register_value & 0b11100000) >> 5;
-			g_ma730.mght = ((uint8_t) register_value & 0b00011100) >> 2;
-			break;
-		}
-		case 0x09:
-		{
-			g_ma730.rd = (uint8_t) register_value >> 7;
-			break;
-		}
-		case 0x1b:
-		{
-			g_ma730.mgl = ((uint8_t) register_value & 0b01000000) >> 6;
-			g_ma730.mgh = ((uint8_t) register_value & 0b10000000) >> 7;
-			break;
-		}
-		default:
-		{
-			break;
-		}
-	}
-
-//	if (g_counter_1hz > 1) // wait 1 sec to analyse data
-//	{
-//		g_motor_status.ma730_is_running = true;
-//		g_motor_status.previous_ma730_value = g_motor_status.current_ma730_value;
-//		g_motor_status.current_ma730_value = (g_MA730_read_buffer >> 2) & 0b0011111111111111;
-//	}
-
-
-}
-
-
-
-
-void MA730_ReadAngle() 
-{
-	uint16_t send_data      = 0x0000 ;
-
-	uint16_t angle_value    = 0;
-
-//	for (uint16_t i = 0; i < 24; i++) NOP;  // wait about 150ns
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
-
-//	for (uint16_t i = 0; i < 13; i++) NOP;  // wait about 80ns
-
-	// SEND READ REGISTER COMMAND - RECEIVE READ ANGLE RESULT
-	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
-
-//	for (uint16_t i = 0; i < 12; i++) NOP;  // wait about 80ns
-
-	g_ma730.angle = (angle_value >> 2) & 0b0011111111111111;
-
-}
-void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value) 
-{
-	uint16_t send_data      = 0b100 << 13 | (reg_number & (0b00011111)) << 8 | reg_value;
-
-	uint16_t angle_value    = 0;
-	uint16_t register_value = 0;
-
-	for (uint16_t i = 0; i < 24; i++) __NOP();  // wait about 150ns
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
-
-	for (uint16_t i = 0; i < 130; i++) __NOP();  // wait about 80ns
-
-	// SEND READ REGISTER COMMAND - RECEIVE READ ANGLE RESULT
-	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
-
-	HAL_Delay(20); // Wait 20 ms after write command
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
-
-	for (uint16_t i = 0; i < 13; i++) __NOP();  // wait about 80ns
-
-	send_data      = 0x0000;
-
-	// SEND READ ANGLE COMMAND - RECEIVE READ REGISTER RESULT
-	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &register_value, 1, 1);
-
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
-
-	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
-
-}
-
 
 
 // Temperature
 float Calculate_ADC_to_Temperature(uint16_t adc_data, uint16_t beta, uint8_t ntc_nominal_temperature, uint16_t ntc_nominal_resistance, uint16_t series_resistance) 
 {
-
 	double vo = (double) adc_data / 65536.0;
 
 	uint16_t ntc_resistance = series_resistance * (1.0 - vo) / vo ;
@@ -939,8 +769,9 @@ bool FSM_START_Callback()
 	g_joint_configuration.pole_pairs = POLE_PAIRS;
 	g_joint_configuration.gear_ratio = GEAR_RATIO;
 
+#if PCB_VERSION >= 0x030000
 	FLASH_Configuration_Load(); // Read configuration from FLASH
-
+#endif
 	// FDCAN
 	HAL_FDCAN_ConfigTxDelayCompensation(&hfdcan1, 10, 0);
 	HAL_FDCAN_EnableTxDelayCompensation(&hfdcan1);
@@ -1070,10 +901,8 @@ bool FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT_Callback()
 bool FSM_FAULT_Callback() 
 {
 	motor_stop();
-	g_counters.spi_txrx_counter++;
 
 	return true;
-	
 }
 
 bool FSM_TRANSITION_FAULT_TO_INIT_Callback() 
@@ -1296,189 +1125,9 @@ void FSM_Tick_Callback()
 			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
 			break;
 
-//		case FSM_START:
-//		{
-//			HAL_TIM_Base_Stop_IT(&htim6); // Disable 10 kHz timer
-
-//			g_joint_configuration.pole_pairs = POLE_PAIRS;
-//			g_joint_configuration.gear_ratio = GEAR_RATIO;
-
-//			FLASH_Configuration_Load(); // Read configuration from FLASH
-
-//			// FDCAN
-//			HAL_FDCAN_ConfigTxDelayCompensation(&hfdcan1, 10, 0);
-//			HAL_FDCAN_EnableTxDelayCompensation(&hfdcan1);
-
-//			FDCAN_Set_Filters();
-
-//			HAL_FDCAN_ConfigGlobalFilter(&hfdcan1, 3, 3, FDCAN_FILTER_REMOTE, FDCAN_REJECT_REMOTE);
-//			HAL_FDCAN_Start(&hfdcan1); //Initialize CAN Bus
-//			HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0);// Initialize CAN Bus Rx Interrupt
-//			HAL_FDCAN_EnableISOMode(&hfdcan1);
-
-//			FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT);
-
-//			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
-
-//			break;
-//		}
-
-//		case FSM_TRANSITION_START_TO_INIT:
-//		{
-//			FSM_Activate_State(FSM_INIT);
-//			break;
-//		}
-
-//		case FSM_INIT:
-//		{
-//			// Wlacz odczyty MA730
-////			if (g_joint_configuration.ma730_enabled == true && g_ma730.started == false)
-////			{
-////				g_ma730.started = true;
-
-////				HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
-
-////				HAL_SPI_TransmitReceive_IT(&hspi1, (uint8_t * ) &g_spi_tx_data, (uint8_t * ) &g_spi_rx_data, 1);
-////			}
-//			// Wylacz odczyty MA730
-////				if (g_joint_configuration.ma730_enabled == false && g_ma730.started == true)
-////				{
-////					g_ma730.started = false;
-////
-////				}
-
-//			break;
-//		}
-
-//		case FSM_TRANSITION_INIT_TO_READY_TO_OPERATE:
-//		{
-//			// Check the calibration
-//			// If joint is not calibrated go to failure
-//			FSM_Activate_State(FSM_READY_TO_OPERATE);
-//			break;
-//		}
-
-//		case FSM_READY_TO_OPERATE:
-//		{
-//			motor_stop();
-//			break;
-//		}
-
-//		case FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE:
-//		{
-//			FSM_Activate_State(FSM_OPERATION_ENABLE);
-//			break;
-//		}
-
-//		case FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE:
-//		{
-//			FSM_Activate_State(FSM_READY_TO_OPERATE);
-//			motor_stop();
-//			break;
-//		}
-
-//		case FSM_TRANSITION_OPERATION_ENABLE_TO_INIT:
-//		{
-//			FSM_Activate_State(FSM_INIT);
-//			break;
-//		}
-
-
-
-//		case FSM_OPERATION_ENABLE:
-//		{
-
-//			int16_t goal = 0;
-
-//			switch (g_joint_command.working_mode)
-//			{
-//				case TORQUE_MODE:
-//				{
-//					goal = g_joint_command._motor_torque;
-//					break;
-//				}
-
-//				case SPEED_MODE:
-//				{
-//					goal = g_joint_command._motor_speed;
-//					break;
-//				}
-//			}
-
-//			if (g_joint_configuration.working_area_constrain_enabled)
-//			{
-//				switch (g_joint_status.current_joint_position)
-//				{
-//					case POSITION_UNDER_WORKING_AREA: // Accept only positive torque
-//						if (goal < 0)
-//						{
-//							motor_stop();
-//						}
-//						else
-//						{
-//							motor_start(g_joint_command.working_mode, goal);
-//						}
-//						break;
-
-//					case POSITION_IN_WORKING_AREA:
-//						motor_start(g_joint_command.working_mode, goal);
-//						break;
-
-//					case POSITION_OVER_WORKING_AREA: // Accept only negative torque
-//						if (goal > 0)
-//						{
-//							motor_stop();
-//						}
-//						else
-//						{
-//							motor_start(g_joint_command.working_mode, goal);
-//						}
-//						break;
-//				}
-
-//			}
-//			else
-//			{
-//				motor_start(g_joint_command.working_mode, goal);
-//			}
-
-//			break;
-
-//		}
-
-//		case FSM_TRANSITION_FAULT_TO_INIT:
-//		{
-//			MC_AcknowledgeFaultMotor1();
-//			g_joint_status.errors = 0;
-//			FSM_Activate_State(FSM_INIT);
-//			break;
-//		}
-
-//		case FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT:
-//		{
-//			motor_stop();
-//			FSM_Activate_State(FSM_FAULT);
-//			break;
-//		}
-
-//		case FSM_FAULT_REACTION_ACTIVE:
-//		{
-//			motor_stop();
-//			FSM_Activate_Transition(FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT);
-//			break;
-//		}
-
-//		case FSM_FAULT:
-//		{
-//			motor_stop();
-//			break;
-//		}
-
 		default:
-		{
 			FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE);
 			break;
-		}
 	}
 }
 
@@ -1486,54 +1135,6 @@ bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition shoul
 {
 	switch (new_state)
 	{
-//		case FSM_START:
-//		{
-//			break;
-//		}
-
-//		case FSM_INIT:
-//		{
-//			if (FSM_Get_State() == FSM_START)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT);
-//			}
-
-//			if (FSM_Get_State() == FSM_FAULT)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_TO_INIT);
-//			}
-
-//			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_INIT);
-//			}
-//			break;
-//		}
-
-//		case FSM_READY_TO_OPERATE:
-//		{
-
-//			if (FSM_Get_State() == FSM_INIT)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_INIT_TO_READY_TO_OPERATE);
-//			}
-
-//			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE);
-//			}
-
-//			break;
-//		}
-
-//		case FSM_OPERATION_ENABLE:
-//		{
-//			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
-//			}
-//			break;
-//		}
 
 		case FSM_CALIBRATION_PHASE_0:
 		{
@@ -1546,24 +1147,6 @@ bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition shoul
 			break;
 		}
 
-//		case FSM_FAULT_REACTION_ACTIVE:
-//		{
-//			if (FSM_Get_State() != FSM_START)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_REACTION_ACTIVE_TO_FAULT);
-//			}
-//			break;
-//		}
-
-//		case FSM_FAULT:
-//		{
-//			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
-//			{
-//				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE);
-//			}
-//			break;
-//		}
-
 		default:
 		{
 			break;
@@ -1574,35 +1157,39 @@ bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition shoul
 }
 
 // HAL Callbacks
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) 
-{
-	// SECURITY ALERT
-    if(GPIO_Pin == SEC_IN_Pin && g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
-    {
-    	motor_stop();
-			FSM_Activate_State(FSM_READY_TO_OPERATE);
-    }
-}
+//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) 
+//{
+//	// SECURITY ALERT
+//    if(GPIO_Pin == SEC_IN_Pin && g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
+//    {
+//    	motor_stop();
+//			FSM_Activate_State(FSM_READY_TO_OPERATE);
+//    }
+//}
 
 
 //void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi) 
 //{
+////	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+
 //	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
 
-//    // TX-RX Done .. Do Something ...
+//  // TX-RX Done .. Do Something ...
 //	g_counters.spi_txrx_counter++;
 
 //	g_ma730.angle = (g_spi_rx_data >> 2) & 0b0011111111111111;
 
-//	if (g_ma730.started)
-//	{
-//		HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+//	g_spi_finished = true;
+//	
+////	if (g_ma730.started)
+////	{
+////		HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
 
-//		if (HAL_SPI_TransmitReceive_IT(&hspi1, (uint8_t * ) &g_spi_tx_data, (uint8_t * ) &g_spi_rx_data, 1) != HAL_OK)
-//		{
-//			Error_Handler();
-//		}
-//	}
+////		if (HAL_SPI_TransmitReceive_IT(&hspi1, (uint8_t * ) &g_spi_tx_data, (uint8_t * ) &g_spi_rx_data, 1) != HAL_OK)
+////		{
+////			Error_Handler();
+////		}
+////	}
 
 //}
 
@@ -1612,39 +1199,60 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 		g_counters.timer6++;
 		Read_MC_Torque();
+		
+		g_joint_status.b_safety_input = (HAL_GPIO_ReadPin(SEC_IN_GPIO_Port, SEC_IN_Pin) == GPIO_PIN_SET) ? (0) : (1);
+//    if(g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
+//		{
+//		}
+		
+		
+		
+//	// SECURITY ALERT
+//    if(GPIO_Pin == SEC_IN_Pin && g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
+//    {
+//    	motor_stop();
+//			FSM_Activate_State(FSM_READY_TO_OPERATE);
+//    }
+//}
+		
+		
 	}
+	
+	if(htim->Instance == TIM7) 	// 10kHz (5,0) - fast recalculation
+	{	
+		g_counters.timer7++;
 
-//	if(htim->Instance == TIM2)
-//	{
-//		g_counters.spi_rx_counter++;
-//	}
-
-	if(htim->Instance == TIM7) 	// 1kHz - FSM_Tasks
-	{
+		// Update data
 		Read_MC_Encoder_1kHz();
 		Update_Data_From_MC(); // Przelicz na jednostki we floatach
 		Read_MC_State(); // Sprawdzenie stanu MC SDK
-		if ( FSM_Get_State() > 0)
-		{
-			CheckErrorsAndWarnings(); // Sprawdzenie czy nie wygenerowaly sie jakies bledy czy ostrzezenia
-		}
 		NTC_CalcAvTemp(&g_TempBearingSensorParamsM1); // Odczyt temperatury lozyska
 
 		// Odczyt enkoderow MA730 oraz MC komutacji
 		if (g_joint_configuration.ma730_enabled == true)
 		{
-//			MA730_ReadAngle();
 			MA730_ReadRegister(0x1B);
-			g_mgh_errors += g_ma730.mgh;
-			g_mgl_errors += g_ma730.mgl;
+//			HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+//			HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &g_spi_tx_data, (uint8_t * ) &g_spi_rx_data, 1, 1);
+//			g_ma730.angle = (g_spi_rx_data >> 2) & 0b0011111111111111;		
+//			HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);		
+		}
+
+		if ( FSM_Get_State() > 0)
+		{
+			CheckErrorsAndWarnings(); // Sprawdzenie czy nie wygenerowaly sie jakies bledy czy ostrzezenia
 		}
 
 		g_joint_status.mc_current_electric_rotation = g_current_electrical_rotation; // pobranie informacji aktualnej z MC
-		g_joint_status.mc_current_electric_position = g_current_electrical_position; // pobranie informacji aktualnej z MC
-//		g_temp_current_position_before = g_current_electrical_position;
 
+		// Reaction on safety in low state
+    if(g_joint_configuration.safety_enabled == true && g_joint_status.b_safety_input == false && g_fsm_status.state == FSM_OPERATION_ENABLE)
+    {
+			FSM_Activate_State(FSM_READY_TO_OPERATE);
+    }
+		
 		// Estimate joint position from absolute encoder
-		if (g_joint_configuration.ma730_enabled == true && g_joint_configuration.calibration_state == JOINT_CALIBRATED)
+		if (g_joint_configuration.ma730_enabled == true && g_joint_configuration.calibration_state == JOINT_CALIBRATED && g_joint_configuration.number_of_sectors > 0)
 		{
 			// JOINT POSITION ESTIMATION
 			switch (g_joint_status.encoder_position_state)
@@ -1654,11 +1262,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					break;
 //
 				case POSITION_ACCURATE:
-//					g_current_sector_number = get_rotation_number_from_calibration_table(0, g_joint_configuration.number_of_sectors - 1, g_ma730.angle, g_joint_configuration.calibration_table_1[0], 1);
+//						g_current_sector_number = get_rotation_number_from_calibration_table(0, g_joint_configuration.number_of_sectors - 1, g_ma730.angle, g_joint_configuration.calibration_table_1[0], 0);
 					break;
 
 				case POSITION_APROXIMATED:
-					g_current_sector_number = get_sector_number_from_calibration(0, g_joint_configuration.number_of_sectors - 1, g_ma730.angle, g_joint_configuration.calibration_table_1[0]);
+					g_current_sector_number = get_sector_number_from_calibration(0, g_joint_configuration.number_of_sectors - 1, g_ma730.angle, g_joint_configuration.calibration_table_1[0], 0);
 
 					// If motor running and sector is change update
 					if (g_current_sector_number != g_previous_sector_number && g_previous_sector_number != -1 && g_current_sector_number != -1) // pass 1 time, to load previous and current
@@ -1693,7 +1301,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 					break;
 
 				case POSITION_UNKNOWN:
-					g_current_sector_number = get_sector_number_from_calibration(0, g_joint_configuration.number_of_sectors - 1, g_ma730.angle, g_joint_configuration.calibration_table_1[0]);
+					g_current_sector_number = get_sector_number_from_calibration(0, g_joint_configuration.number_of_sectors - 1, g_ma730.angle, g_joint_configuration.calibration_table_1[0], 0);
 					if (g_current_sector_number != -1)
 					{
 						float electric_rotation_width = M_TWOPI / (g_joint_configuration.pole_pairs * g_joint_configuration.gear_ratio);
@@ -1718,11 +1326,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 
 		// FSM
-		FSM_Tick() ;
-		
-		g_counters.timer7++;
+		FSM_Tick() ;			
 	}
 }
+	
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs) 
 {
 
@@ -2006,16 +1613,213 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 	}
 }
 
-void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) 
-{
-//	g_counter2++;
+//void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) 
+//{
+////	g_counter2++;
+//}
+
+
+
+//void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) 
+//{
+////	g_counter2++;
+
+//}
+
+// PZ
+void pz_spi_transfer(uint8_t *data_tx, uint8_t *data_rx, uint16_t datasize) {
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+
+  for (uint16_t i = 0; i < datasize; i++) {
+#if PCB_VERSION >= 0x030000
+//		HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#else
+//		HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#endif	
+	}
+
+	
+//    digitalWrite(NCS_PIN, LOW);
+// 
+//    for (uint16_t i = 0; i < datasize; i++)
+//        data_rx[i] = SPI.transfer(data_tx[i]);
+// 
+//    digitalWrite(NCS_PIN, HIGH);
+	
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);	
 }
 
-
-
-void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) 
+// MA730
+void MA730_ReadRegister(uint8_t reg_number) 
 {
-//	g_counter2++;
+	uint16_t send_data      = 0b010 << 13 | (reg_number & (0b00011111)) << 8 ;
+
+	uint16_t angle_value    = 0;
+	uint16_t register_value = 0;
+
+	for (uint16_t i = 0; i < 24; i++) __NOP();  // wait about 150ns
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+
+	for (uint16_t i = 0; i < 130; i++) __NOP();  // wait about 80ns
+
+	// SEND READ REGISTER COMMAND - RECEIVE READ ANGLE RESULT
+#if PCB_VERSION >= 0x030000
+	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#else
+	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#endif
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+
+	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+
+	for (uint16_t i = 0; i < 13; i++) __NOP();  // wait about 80ns
+
+	send_data      = 0x0000;
+
+	// SEND READ ANGLE COMMAND - RECEIVE READ REGISTER RESULT
+#if PCB_VERSION >= 0x030000
+	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &register_value, 1, 1);
+#else
+	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &register_value, 1, 1);
+#endif
+
+//	g_MA730_read_buffer = register_value >> 8;
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+
+	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
+
+	g_ma730.angle = (angle_value >> 2) & 0b0011111111111111;
+
+	register_value = register_value >> 8;
+	switch (reg_number)
+	{
+		case 0x00:
+		{
+			g_ma730.z0 = (uint8_t) register_value;
+			break;
+		}
+		case 0x01:
+		{
+			g_ma730.z1 = (uint8_t) register_value;
+			break;
+		}
+		case 0x02:
+		{
+			g_ma730.bct = (uint8_t) register_value;
+			break;
+		}
+		case 0x03:
+		{
+			g_ma730.ety = ((uint8_t) register_value & 0b00000010) >> 1;
+			g_ma730.etx = ((uint8_t) register_value & 0b00000001);
+			break;
+		}
+		case 0x04:
+		{
+			g_ma730.ppt0 = ((uint8_t) register_value & 0b11000000) >> 6;
+			g_ma730.ilip = ((uint8_t) register_value & 0b00111100) >> 2;
+			break;
+		}
+		case 0x05:
+		{
+			g_ma730.ppt1 = (uint8_t) register_value;
+			break;
+		}
+		case 0x06:
+		{
+			g_ma730.mglt = ((uint8_t) register_value & 0b11100000) >> 5;
+			g_ma730.mght = ((uint8_t) register_value & 0b00011100) >> 2;
+			break;
+		}
+		case 0x09:
+		{
+			g_ma730.rd = (uint8_t) register_value >> 7;
+			break;
+		}
+		case 0x1b:
+		{
+			g_ma730.mgl = ((uint8_t) register_value & 0b01000000) >> 6;
+			g_ma730.mgh = ((uint8_t) register_value & 0b10000000) >> 7;
+			break;
+		}
+		default:
+		{
+			break;
+		}
+	}
+}
+
+void MA730_ReadAngle() 
+{
+	uint16_t send_data      = 0x0000 ;
+
+	uint16_t angle_value    = 0;
+
+//	for (uint16_t i = 0; i < 24; i++) NOP;  // wait about 150ns
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+
+//	for (uint16_t i = 0; i < 13; i++) NOP;  // wait about 80ns
+
+	// SEND READ REGISTER COMMAND - RECEIVE READ ANGLE RESULT
+#if PCB_VERSION >= 0x030000
+	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#else
+	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#endif
+	
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+
+//	for (uint16_t i = 0; i < 12; i++) NOP;  // wait about 80ns
+
+	g_ma730.angle = (angle_value >> 2) & 0b0011111111111111;
+
+}
+
+void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value) 
+{
+	uint16_t send_data      = 0b100 << 13 | (reg_number & (0b00011111)) << 8 | reg_value;
+
+	uint16_t angle_value    = 0;
+	uint16_t register_value = 0;
+
+	for (uint16_t i = 0; i < 24; i++) __NOP();  // wait about 150ns
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+
+	for (uint16_t i = 0; i < 130; i++) __NOP();  // wait about 80ns
+
+	// SEND READ REGISTER COMMAND - RECEIVE READ ANGLE RESULT
+#if PCB_VERSION >= 0x030000
+	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#else
+	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+#endif
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+
+	HAL_Delay(20); // Wait 20 ms after write command
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+
+	for (uint16_t i = 0; i < 13; i++) __NOP();  // wait about 80ns
+
+	send_data      = 0x0000;
+
+	// SEND READ ANGLE COMMAND - RECEIVE READ REGISTER RESULT
+#if PCB_VERSION >= 0x030000
+	HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &register_value, 1, 1);
+#else
+	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &register_value, 1, 1);
+#endif
+
+	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+
+	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
 
 }
 
@@ -2071,7 +1875,7 @@ uint16_t NTC_CalcAvTemp( NTC_Handle_t * pHandle )
   return ( pHandle->hFaultState );
 }
 
-//#if SDK_VERSION == 0x055a0300
+//#if SDK_VERSION >= 0x055a0000
 
 int32_t MCM_Sqrt( int32_t wInput ) 
 {

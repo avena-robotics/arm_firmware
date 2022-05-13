@@ -7,10 +7,14 @@ extern "C" {
 #endif
 
 #include <main.h>
+#include "math.h"
+
+#if SDK_VERSION >= 0x055a0000
 #include "mc_configuration_registers.h"
+#endif
 
 #define GEAR_RATIO												(uint16_t) 121
-#define JOINT_SPEED_LIMIT									(float) 1.5
+#define JOINT_SPEED_LIMIT									(float) 1.8
 #define CALIBRATION_TORQUE_LIMIT					1000
 #define CALIBRATION_SPEED_LIMIT						10
 #define CALIBRATION_ZERO_POSITION_OFFSET	10
@@ -40,7 +44,8 @@ typedef enum Joint_Warning {
 	JOINT_NO_WARNING = 0,
 	JOINT_POSITION_NOT_ACCURATE = 1,
 	JOINT_OUTSIDE_WORKING_AREA = 2,
-	JOINT_MA730_NOT_PROPER_MAGNETOC_FIELD = 4
+	JOINT_MA730_NOT_PROPER_MAGNETOC_FIELD = 4,
+	JOINT_SAFETY = 8,	
 } Joint_Warning_t;
 
 typedef enum Calibration_State {
@@ -111,6 +116,8 @@ typedef struct Joint_Configuration_Handle {
 	float electric_rotation_width;
 
 	bool ma730_enabled;
+	bool pz2656_enabled;
+	
 	bool motor_temperature_enabled;
 	bool bearing_temperature_enabled;
 	bool safety_enabled;
@@ -134,7 +141,7 @@ typedef struct Joint_Configuration_Handle {
 
 } __attribute__ ((packed)) Joint_Configuration_Handle_t;
 
-typedef struct App_Command_Handle {
+typedef struct Joint_Command_Handle {
 	Working_Mode_t working_mode;
 	float joint_torque;				// Nm
 	float motor_torque;				// Nm
@@ -145,7 +152,7 @@ typedef struct App_Command_Handle {
 	int16_t _motor_torque;			//
 	int16_t _motor_speed;			//
 	int32_t _motor_position;		//
-} __attribute__ ((packed)) App_Command_Handle_t;
+} __attribute__ ((packed)) Joint_Command_Handle_t;
 
 typedef enum Joint_Position_State {
 	POSITION_IN_WORKING_AREA = 0, /**< @brief Starting uC.*/
@@ -186,19 +193,22 @@ typedef struct Joint_Status_Handle {
 	uint16_t mc_previous_motor_position;
 	int32_t mc_current_electric_rotation;
 	int16_t mc_current_electric_position;
-//	int16_t mc_previous_electric_position;
 
+	bool b_safety_input; // 1 - no error, 0 - error
+
+#if PCB_VERSION >= 0x030000
 	bool gd_nfault;
 	bool gd_ready;
+#endif
 
 	uint8_t errors;
 	uint8_t warnings;
 
 //	PosCtrlStatus_t mc_position_control_status;
 //	AlignStatus_t mc_encoder_align_status;
-#if SDK_VERSION == 0x055a0300
+#if SDK_VERSION <= 0x055a0300
 	State_t stm_state_motor;
-#elif SDK_VERSION == 0x055a0400
+#elif SDK_VERSION >= 0x055a0400
 	MCI_State_t stm_state_motor;
 #endif
 
@@ -245,7 +255,11 @@ extern volatile int16_t g_current_electrical_position;
 extern TIM_HandleTypeDef htim6;
 extern TIM_HandleTypeDef htim7;
 extern FDCAN_HandleTypeDef hfdcan1;
+#if PCB_VERSION >= 0x030000
 extern SPI_HandleTypeDef hspi1;
+#else
+extern SPI_HandleTypeDef hspi2;
+#endif
 
 #ifdef __cplusplus
 }
