@@ -1,6 +1,7 @@
-#include "commons_uj.h"
+#include "universal_joint.h"
+#include "pz_1sf_driver.h"
 #include "fsm.h"
-
+#include <stdlib.h>
 //#pragma GCC push_options
 //#pragma GCC optimize ("O0")
 
@@ -9,6 +10,15 @@
 // 5.Y.3 // 0x055a0300
 // 5.Y.4 // 0x055a0400
 
+union register_data_t {
+	 uint16_t data[4];
+	 uint64_t flash;
+};
+
+union register_data_t g_non_rw_non_volatile[16] = {0};
+union register_data_t g_non_ro_non_volatile[16] = {0};
+union register_data_t g_non_rw_volatile[16] = {0};
+union register_data_t g_non_ro_volatile[16] = {0};
 
 FDCAN_RxHeaderTypeDef can_rx_header; // CAN Bus Transmit Header
 FDCAN_TxHeaderTypeDef can_tx_header; // CAN Bus Transmit Header
@@ -18,6 +28,8 @@ uint8_t can_tx_data[24] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};  //
 volatile uint16_t g_spi_rx_data    	= 0x0000 ;
 volatile uint16_t g_spi_tx_data    	= 0x0000 ;
 volatile bool     g_spi_finished 		= false;
+
+volatile bool     g_wchdg_ok 				= false;
 
 // FLASH
 // 0x018000 -  98304 (32kB z tylu na konfiguracje)
@@ -33,8 +45,24 @@ float g_diff_current_electric_position;
 float g_electric_offset_to_zero_in_rad;
 float g_encoder_offset_to_current_in_rad;
 
+#define CALIBRATION_ZERO_POSITION_COUNTER	15
+uint16_t g_encoder_position[2][CALIBRATION_ZERO_POSITION_COUNTER] = {0};
+float g_encoder_position_summary[2][3] = {0.0};
+
 uint16_t g_mgh_errors = 0;
 uint16_t g_mgl_errors = 0;
+// PZ FIXME
+volatile uint32_t g_pz2656_angle = 0;
+volatile float g_pz2656_angle_deg = 0;
+volatile uint8_t buf_tx[0x0F + 3] = {0};
+volatile uint8_t buf_rx[0x0F + 3] = {0};
+volatile uint16_t bufsize = 0;
+
+uint32_t g_pz2656_id = 0;
+uint8_t data1[4] = {0};
+uint8_t data2[4] = {0};
+uint8_t data3[4] = {0};
+uint8_t data4[4] = {0};
 
 volatile int16_t g_temp_current_position_before = 0;
 volatile int16_t g_temp_current_position_after = 0;
@@ -67,22 +95,21 @@ Counters_Handle_t volatile g_counters = {
 	.spi_txrx_counter = 0,
 };
 
-
 Joint_Command_Handle_t g_joint_command = {
 	.working_mode = TORQUE_MODE,
 	.motor_torque = 0.0,
 };
 
 volatile Joint_Configuration_Handle_t g_joint_configuration = {
-	.ma730_enabled = false,
-	.pz2656_enabled = false,
+	.absolute_encoder_enabled = false,
 	.safety_enabled = false,
 	.working_area_constrain_enabled = false,
+	.canbus_watchdog_enabled = false,
+	.speed_limit_enabled = true,
 	.motor_type = MOTOR_TYPE,
 	.can_node_id = 0x00,
 	.gear_ratio = 121,
 };
-
 
 Joint_Status_Handle_t g_joint_status = {
 	.mc_current_motor_position = 0,
@@ -95,10 +122,18 @@ volatile MA730_Handle_t	g_ma730 = {
 	.angle = 0x00,
 };
 
+volatile PZ2656_Handle_t	g_pz2656 = {
+	.started = false,
+	.angle = 0x00,
+	.diag = 0x00000000,
+	.revert_direction = 0,
+};
+
 volatile FSMStatus_t 	g_fsm_status = {
-	.state = FSM_START,
-	.state_is_running = false,
-	.transition_is_running = false,
+	.current_state = FSM_START,
+	.new_state 	   = FSM_START,
+//	.state_is_running = false,
+//	.transition_is_running = false,
 };
 
 
@@ -122,45 +157,113 @@ NTC_Handle_t   g_TempBearingSensorParamsM1 = {
 
 // LOCAL FUNCTIONS DEFINITIONS
 float Calculate_ADC_to_Temperature(uint16_t adc_data, uint16_t beta, uint8_t nominal_temperature, uint16_t ntc_nominal_resistance, uint16_t series_resistance);
+uint32_t FLASH_Configuration_Save();
+
+#ifdef ENCODER_MA730
 void MA730_ReadRegister(uint8_t reg_number);
 void MA730_ReadAngle(void);
 void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value);
-void motor_stop(void);
+#endif
+
+#ifdef ENCODER_PZ2656
+void PZ2656_ReadAngle(void);
+#endif
+
+//void motor_stop(void);
 uint16_t NTC_SetFaultState(NTC_Handle_t * pHandle);
 void pz_spi_transfer(uint8_t *data_tx, uint8_t *data_rx, uint16_t datasize);
 
 // FUNCTIONS BODIES
-void UJ_Init() {
-//	NTC_Init(&g_TempBearingSensorParamsM1);
+int cmpfunc (const void * a, const void * b) {
+   return ( * (int * ) a - * (int * ) b );
+}
 
-//	MA730_WriteRegister(0, 0b00000000);
-//	MA730_WriteRegister(1, 0b00000000);
-//	MA730_WriteRegister(2, 0b10010000); // BCT=144
-//	MA730_WriteRegister(3, 0b00000000); // ETX=0, ETY=0
-//	MA730_WriteRegister(4, 0b11000000);
-//	MA730_WriteRegister(5, 0b11111111);
-//	MA730_WriteRegister(6, 0b00011100);
-//	MA730_WriteRegister(9, 0b00000000);
+void UJ_Init() 
+{
+	// NTC
+	NTC_Init(&g_TempBearingSensorParamsM1);
 
-//	MA730_ReadRegister(0);
-//	MA730_ReadRegister(1);
-//	MA730_ReadRegister(2);
-//	MA730_ReadRegister(3);
-//	MA730_ReadRegister(4);
-//	MA730_ReadRegister(5);
-//	MA730_ReadRegister(6);
-//	MA730_ReadRegister(9);
+#ifdef ENCODER_MA730
+	MA730_WriteRegister(0, 0b00000000);
+	MA730_WriteRegister(1, 0b00000000);
+	MA730_WriteRegister(2, 0b10010000); // BCT=144
+	MA730_WriteRegister(3, 0b00000000); // ETX=0, ETY=0
+	MA730_WriteRegister(4, 0b11000000);
+	MA730_WriteRegister(5, 0b11111111);
+	MA730_WriteRegister(6, 0b00011100);
+	MA730_WriteRegister(9, 0b00000000);
 
-	// TIMERS
+	MA730_ReadRegister(0);
+	MA730_ReadRegister(1);
+	MA730_ReadRegister(2);
+	MA730_ReadRegister(3);
+	MA730_ReadRegister(4);
+	MA730_ReadRegister(5);
+	MA730_ReadRegister(6);
+	MA730_ReadRegister(9);
+#endif
+	
+	
+#ifdef ENCODER_PZ2656
+	pz_write_param(&PZ_FCL, 			0x00);
+	pz_write_param(&PZ_FCS, 			0x00);
+	pz_write_param(&PZ_SPI_EXT,		0x01);
+	pz_write_param(&PZ_MT_PDL, 		0x00);
+	pz_write_param(&PZ_ST_PDL, 		0x10);
+	pz_write_param(&PZ_SPI_MT_DL, 0x00);
+	pz_write_param(&PZ_SPI_ST_DL, 0x10);	
+
+	// PZ2656 Init
+//	pz_write_command(0x40); // CONF_READ_ALL
+//	g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
+
+//	g_pz2656.reg_st_pre 		= 0x00F78C25;
+//	pz_write_param(&PZ_ST_PRE, g_pz2656.reg_st_pre);
+
+//	g_pz2656.reg_st_off 		= 0x00F78C25;
+//	pz_write_param(&PZ_ST_OFF, g_pz2656.reg_st_off);
+
+//	pz_write_command(0x80); // MTST_PRESET
+//	g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
+
+	g_pz2656.reg_fcs 				= pz_read_param(&PZ_FCL);
+	g_pz2656.reg_fcs 				= pz_read_param(&PZ_FCS);
+	g_pz2656.reg_spi_ext 		= pz_read_param(&PZ_SPI_EXT);
+	g_pz2656.reg_mt_pdl 		= pz_read_param(&PZ_MT_PDL);
+	g_pz2656.reg_st_pdl 		= pz_read_param(&PZ_ST_PDL);
+	g_pz2656.reg_spi_mt_dl 	= pz_read_param(&PZ_SPI_MT_DL);
+	g_pz2656.reg_spi_st_dl 	= pz_read_param(&PZ_SPI_ST_DL);
+
+	// Data readed from FLASH
+	// DIGITAL ALIGNMENT
+	g_pz2656.reg_ai_phase 	= pz_read_param(&PZ_AI_PHASE);
+	g_pz2656.reg_ai_scale 	= pz_read_param(&PZ_AI_SCALE);
+
+	// ANALOG ALIGNMENT
+	g_pz2656.reg_cos_off 		= pz_read_param(&PZ_COS_OFF); // PZ_COS_OFF
+	g_pz2656.reg_sin_off 		= pz_read_param(&PZ_SIN_OFF); // PZ_SIN_OFF
+	g_pz2656.reg_sc_gain 		= pz_read_param(&PZ_SC_GAIN); // PZ_SC_GAIN
+	g_pz2656.reg_sc_phase		= pz_read_param(&PZ_SC_PHASE); // PZ_SC_PHASE
+	
+	g_pz2656.offset = 30356;
+	g_pz2656.revert_direction = 1;
+	
+#endif
+
+	HAL_Delay(10); // Wait to initialize all pheripherals
+
+	
+	// TIMERS Init
 	HAL_TIM_Base_Start_IT(&htim6); 	// Enable 10 kHz timer for fast calculation
 	HAL_TIM_Base_Start_IT(&htim7);  	// Enable  1 kHz timer for FSM
+
+//	FLASH_Configuration_Save();
 
 }
 
 // MOTOR
 void motor_start(Working_Mode_t mode, int16_t goal) 
 {
-
 	g_joint_command.working_mode = mode;
 
 	switch (g_joint_command.working_mode)
@@ -185,7 +288,8 @@ void motor_start(Working_Mode_t mode, int16_t goal)
 
 void motor_stop() 
 {
-	if (g_joint_status.stm_state_motor == RUN)
+//	if (g_joint_status.stm_state_motor == RUN)
+	if (g_joint_status.stm_state_motor != IDLE)
 	{
 		// clear torque readings
 		for (int i = 0; i < CURRENT_TORQUE_DATA_SIZE; i++)
@@ -205,6 +309,7 @@ void motor_stop()
 	}
 }
 
+#ifdef ENCODER_MA730
 bool motor_reach_torque_limit() 
 {
 	if (g_joint_status.mc_current_motor_torque > g_calibration_torque_limit && g_joint_status.stm_state_motor == RUN) return true;
@@ -215,7 +320,7 @@ bool motor_reach_torque_limit()
 
 bool motor_in_position(volatile int32_t position) 
 {
-	if (abs((int64_t) g_joint_status.mc_current_motor_position_multiturn - position) < CALIBRATION_ZERO_POSITION_OFFSET) return true;
+	if ( llabs((int64_t) (g_joint_status.mc_current_motor_position_multiturn - position)) < CALIBRATION_ZERO_POSITION_OFFSET) return true;
 
 	return false;
 }
@@ -329,10 +434,10 @@ int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t
 	{
 		int16_t mid = left_index + (right_index - left_index) / 2; // srodek zakresu tablicy
 
-		uint32_t right_index_value = g_joint_configuration.calibration_table_1[mid - 1];
-		uint32_t mid_index_value   = g_joint_configuration.calibration_table_1[mid];
-		uint32_t left_index_value  = g_joint_configuration.calibration_table_1[mid + 1];
-		uint32_t searched_value    = ma730_value; // wartosc szukana
+		int32_t right_index_value = g_joint_configuration.calibration_table_1[mid - 1];
+		int32_t mid_index_value   = g_joint_configuration.calibration_table_1[mid];
+		int32_t left_index_value  = g_joint_configuration.calibration_table_1[mid + 1];
+		int32_t searched_value    = ma730_value; // wartosc szukana
 
 		// Przesuniecie wartosci o offset, by funkcja byla w calej dlugosci ciagla
 		if (right_index_value <= offset)
@@ -357,7 +462,7 @@ int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t
 		{
 			if (searched_value >= mid_index_value && searched_value <= left_index_value)
 			{
-				if (abs(searched_value - mid_index_value) <= abs(searched_value - left_index_value) )
+				if ( abs(searched_value - mid_index_value) <= abs(searched_value - left_index_value) )
 				{
 					return mid;
 				}
@@ -368,7 +473,7 @@ int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t
 			}
 			else
 			{
-				if (abs(searched_value - mid_index_value) <= abs(searched_value - right_index_value) )
+				if ( abs(searched_value - mid_index_value) <= abs(searched_value - right_index_value) )
 				{
 					return mid;
 				}
@@ -406,6 +511,7 @@ int16_t get_rotation_number_from_calibration_table(uint16_t left_index, uint16_t
 	return -1; // element poza sektorami
 }
 
+#endif
 void Read_MC_Encoder_1kHz() 
 {
 	// READ POSITION
@@ -525,7 +631,7 @@ void CheckErrorsAndWarnings()
 	}
 
 	// OVERSPEED ERROR REACTION
-	if ((fabs(g_joint_status.f_current_joint_speed) > JOINT_SPEED_LIMIT) && FSM_Get_State() != FSM_TRANSITION_FAULT_TO_INIT) {
+	if ((fabs(g_joint_status.f_current_joint_speed) > JOINT_SPEED_LIMIT) && FSM_Get_State() != FSM_TRANSITION_FAULT_TO_INIT && g_joint_configuration.speed_limit_enabled == true) {
 		g_joint_status.errors =  g_joint_status.errors | JOINT_SPEED_TO_HIGH;
 		error = true;
 	}
@@ -584,6 +690,8 @@ void CheckErrorsAndWarnings()
 	if (g_ma730.mgl || g_ma730.mgh) // not proper magnetic field strentgh
 	{
 		g_joint_status.warnings |= JOINT_MA730_NOT_PROPER_MAGNETOC_FIELD;
+		if (g_ma730.mgh) g_mgh_errors++;
+		if (g_ma730.mgl) g_mgl_errors++;
 	}
 	else
 	{
@@ -592,8 +700,37 @@ void CheckErrorsAndWarnings()
 	}
 }
 
+bool WCHDG_CheckTasks() 
+{
+
+	if (g_joint_configuration.canbus_watchdog_enabled == true && g_counters.can_rx_counter == 0 && g_counters.can_tx_counter == 0) {
+		return false;
+	}
+	
+	if (g_high_frequency_task_running == 0 && FSM_Get_State() == FSM_OPERATION_ENABLE) {
+		return false;
+	}
+
+	if (g_medium_frequency_task_running == 0) {
+		return false;
+	}
+
+	if (g_safety_task == 0) {
+		return false;
+	}
+	
+	return true;
+}
+
+void WCHDG_ResetCounters() 
+{
+	g_high_frequency_task_running = 0; // only running in OPERATION_ENABLE
+	g_medium_frequency_task_running = 0;
+	g_safety_task = 0;
+}
 // CAN FD
-void FDCAN_Set_Filters() {
+void FDCAN_Set_Filters() 
+{
 	// CAN FILTERS
 	FDCAN_FilterTypeDef   can_filter_config_0; // BROADCAST
 	can_filter_config_0.IdType = FDCAN_STANDARD_ID;
@@ -631,61 +768,69 @@ void FLASH_Configuration_Load()
 {
 	Flash_Read_Data(g_flash_address_configuration, (uint32_t *) g_calibration_config, 10);
 
-	g_joint_configuration.calibration_table_size 			= g_calibration_config[8]; // FIXME !!!!
+#ifdef ENCODER_MA730
+	g_joint_configuration.calibration_table_size 						= g_calibration_config[8]; // FIXME !!!!
 
 	if (g_joint_configuration.calibration_table_size > 0 && g_joint_configuration.calibration_table_size < 65535) {
 		// Read joint configuration from FLASH
-		g_joint_configuration.pole_pairs 						= g_calibration_config[0];
-		g_joint_configuration.gear_ratio 						= g_calibration_config[1];
-		g_joint_configuration.calibration_sector_size 			= g_calibration_config[4];
+		g_joint_configuration.pole_pairs 											= g_calibration_config[0];
+		g_joint_configuration.gear_ratio 											= g_calibration_config[1];
+		g_joint_configuration.calibration_sector_size 				= g_calibration_config[4];
 		g_joint_configuration.reachable_electrical_rotations	= g_calibration_config[5];
-		g_joint_configuration.number_of_sectors 				= g_calibration_config[8];
+		g_joint_configuration.number_of_sectors 							= g_calibration_config[8];
 		// 9
-		g_joint_configuration.zero_electric_position 			= (int16_t) g_calibration_config[12];
-		g_joint_configuration.zero_electric_rotation 			= g_calibration_config[13];
+		g_joint_configuration.zero_electric_position 					= (int16_t) g_calibration_config[12];
+		g_joint_configuration.zero_electric_rotation 					= g_calibration_config[13];
 
-		g_joint_configuration.can_node_id 						= g_calibration_config[16];
+		g_joint_configuration.can_node_id 										= g_calibration_config[16];
 		if (g_joint_configuration.can_node_id == 255)
 		{
-			g_joint_configuration.can_node_id = 0;
+			g_joint_configuration.can_node_id 									= 0;
 		}
-		g_joint_configuration.motor_type 						= g_calibration_config[17];
+		g_joint_configuration.motor_type 											= g_calibration_config[17];
 
 		// Read calibration table from FLASH
 		//	for (int i = 0; i <= g_joint_configuration.calibration_table_size / 2 + 1; i++) {
 		for (int i = 0; i <= g_joint_configuration.calibration_table_size; i++) {
 			Flash_Read_Data (g_flash_address_calibration_table + i * 8, (uint32_t *) g_data, 1);
-			g_joint_configuration.calibration_table_1[i]	= g_data[0] >> 16;
-			g_joint_configuration.calibration_table_2[i] 	= g_data[0];
+			g_joint_configuration.calibration_table_1[i]				= g_data[0] >> 16;
+			g_joint_configuration.calibration_table_2[i] 				= g_data[0];
 		}
 
 		g_joint_configuration.maximum_electrical_rotations = g_joint_configuration.gear_ratio * g_joint_configuration.pole_pairs;
 
-		g_joint_configuration.electric_rotation_width = M_TWOPI / (g_joint_configuration.pole_pairs * g_joint_configuration.gear_ratio); // szerokosc jednego obrotu elektrycznego silnika w stosunku do szerokosci obrotu jointa (2PI)
-		g_joint_configuration.calibration_state = JOINT_CALIBRATED;
+		g_joint_configuration.electric_rotation_width 				= M_TWOPI / (g_joint_configuration.pole_pairs * g_joint_configuration.gear_ratio); // szerokosc jednego obrotu elektrycznego silnika w stosunku do szerokosci obrotu jointa (2PI)
+		g_joint_configuration.calibration_state 							= JOINT_CALIBRATED;
 
 	}
-	g_joint_configuration.joint_working_area = M_PI * (180.0 - 7.655 - 1.0) / 180.0;
+#endif
+	g_joint_configuration.joint_working_area 								= M_PI * (180.0 - 7.655 - 1.0) / 180.0;
 }
 
 uint32_t FLASH_Configuration_Save() 
 {
+	// wylaczenie enkoder absolutnego
+	g_joint_configuration.absolute_encoder_enabled = false;
+	g_pz2656.started = false;
 	volatile uint32_t error = 0;
-	uint64_t data;
 
 	HAL_FLASH_Unlock();
 
+#ifdef ENCODER_MA730
+
 	FLASH_EraseInitTypeDef EraseInitStruct;
 	EraseInitStruct.TypeErase 	= FLASH_TYPEERASE_PAGES;
-	EraseInitStruct.Banks 		= FLASH_BANK_1;
-	EraseInitStruct.Page 		= (g_flash_address_configuration & 0x07FFFFFF) / FLASH_PAGE_SIZE;
-	EraseInitStruct.NbPages 	= 4; // 1 - 2kB
+	EraseInitStruct.Banks 			= FLASH_BANK_1;
+	EraseInitStruct.Page 				= (g_flash_address_configuration & 0x07FFFFFF) / FLASH_PAGE_SIZE;
+	EraseInitStruct.NbPages 		= 4; // 1 - 2kB
 	uint32_t PageError;
 
 	if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
 	{
 		error = HAL_FLASH_GetError ();
 	}
+
+	uint64_t data;
 
 	// Configuration
 	// 1 - 0 - 3
@@ -695,6 +840,7 @@ uint32_t FLASH_Configuration_Save()
 		error = HAL_FLASH_GetError ();
 	}
 
+	
 	// 2 - 4 - 7
 	data = (g_joint_configuration.reachable_electrical_rotations << 16) | g_joint_configuration.calibration_sector_size;
 	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, g_flash_address_configuration + 8, data) != HAL_OK)
@@ -733,7 +879,74 @@ uint32_t FLASH_Configuration_Save()
 		}
 	}
 
-	HAL_FLASH_Lock();
+#endif
+
+#ifdef ENCODER_PZ2656
+
+	FLASH_EraseInitTypeDef EraseInitStruct;
+	EraseInitStruct.TypeErase 	= FLASH_TYPEERASE_PAGES;
+	EraseInitStruct.Banks 			= FLASH_BANK_1;
+	EraseInitStruct.Page 				= (g_flash_address_configuration & 0x07FFFFFF) / FLASH_PAGE_SIZE;
+	EraseInitStruct.NbPages 		= 4; // 1 - 2kB
+	uint32_t PageError;
+
+	if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+	{
+		error = HAL_FLASH_GetError ();
+	}
+
+	// Configuration
+	// NON VOLATILE RW
+	g_non_rw_non_volatile[0].data[0] = g_joint_configuration.can_node_id;
+	g_non_rw_non_volatile[15].data[3]= g_joint_configuration.can_node_id;
+
+	// NON VOLATILE RO
+	g_non_ro_non_volatile[0].data[0] = g_joint_configuration.motor_type;
+	g_non_ro_non_volatile[0].data[1] = g_joint_configuration.gear_ratio;
+
+	g_non_ro_non_volatile[3].data[0] = ((uint32_t) PCB_VERSION >> 16) & 0xFFFF;
+	g_non_ro_non_volatile[3].data[1] = (uint32_t) PCB_VERSION & 0xFFFF;
+
+	g_non_ro_non_volatile[6].data[0] = g_pz2656.offset; // 2B;
+	g_non_ro_non_volatile[6].data[1] = g_pz2656.reg_ai_phase; // 1B
+	g_non_ro_non_volatile[6].data[2] = g_pz2656.reg_cos_off; 	// 2B
+	g_non_ro_non_volatile[6].data[3] = g_pz2656.reg_sin_off; 	// 2B
+
+	g_non_ro_non_volatile[7].data[0] = g_pz2656.reg_sc_gain; // 2B
+	g_non_ro_non_volatile[7].data[1] = g_pz2656.reg_sc_phase; // 1B
+	g_non_ro_non_volatile[7].data[2] = (g_pz2656.reg_ecc_amp >> 16) & 0xFFFF; // 2B
+	g_non_ro_non_volatile[7].data[3] = g_pz2656.reg_ecc_amp & 0xFFFF; // 2B
+
+	g_non_ro_non_volatile[8].data[0] = g_pz2656.reg_ecc_phase; // 2B
+	g_non_ro_non_volatile[8].data[1] = 0x00; // 2B
+	g_non_ro_non_volatile[8].data[2] = 0x00; // 2B
+	g_non_ro_non_volatile[8].data[3] = 0x00; // 2B
+
+	g_non_ro_non_volatile[15].data[3]= 0x01; // 2B
+	
+	uint16_t offset = 0;
+
+	for( int i = 0; i < 16; i++) 
+	{
+		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, g_flash_address_configuration + i * 8 + offset, g_non_rw_non_volatile[i].flash) != HAL_OK)
+		{
+			error = HAL_FLASH_GetError ();
+		}
+	}
+
+	offset = 128;
+	
+	for( int i = 0; i < 16; i++) 
+	{
+		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, g_flash_address_configuration + i * 8 + offset, g_non_ro_non_volatile[i].flash) != HAL_OK)
+		{
+			error = HAL_FLASH_GetError ();
+		}
+	}
+
+#endif
+
+HAL_FLASH_Lock();
 
 	return error;
 }
@@ -766,7 +979,10 @@ bool FSM_START_Callback()
 {
 	HAL_TIM_Base_Stop_IT(&htim6); // Disable 10 kHz timer
 
+#ifdef ENCODER_MA730
 	g_joint_configuration.pole_pairs = POLE_PAIRS;
+#endif
+	
 	g_joint_configuration.gear_ratio = GEAR_RATIO;
 
 #if PCB_VERSION >= 0x030000
@@ -855,7 +1071,6 @@ bool FSM_OPERATION_ENABLE_Callback()
 				}
 				break;
 		}
-
 	}
 	else
 	{
@@ -877,7 +1092,7 @@ bool FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE_Callback()
 {
 	motor_start(g_joint_command.working_mode, 0);
 	// sprawdzenie czy MC jest w RUN
-	if (	g_joint_status.stm_state_motor == RUN)
+	if ( g_joint_status.stm_state_motor == RUN)
 		return true;	
 	else
 		return false;
@@ -886,7 +1101,6 @@ bool FSM_TRANSITION_READY_TO_OPERATE_TO_OPERATION_ENABLE_Callback()
 bool FSM_FAULT_REACTION_ACTIVE_Callback()
 {
 	motor_stop();
-	g_counters.spi_tx_counter++;
 
 	return true;	
 }
@@ -918,13 +1132,15 @@ void FSM_Tick_Callback()
 	
 	// FSM
 	switch (FSM_Get_State()) {
+
+#ifdef ENCODER_MA730
 		
 		case FSM_TRANSITION_INIT_TO_CALIBRATION_PHASE_0:
 			FSM_Activate_State(FSM_CALIBRATION_PHASE_0);
 			break;
 		
 		case FSM_CALIBRATION_PHASE_0:
-			g_joint_configuration.ma730_enabled = true;
+			g_joint_configuration.absolute_encoder_enabled = true;
 			g_joint_configuration.motor_type = RI70;
 			g_joint_configuration.calibration_state = JOINT_NOT_CALIBRATED;
 
@@ -952,8 +1168,7 @@ void FSM_Tick_Callback()
 				g_joint_configuration.calibration_table_1[i] = 0;
 				g_joint_configuration.calibration_table_2[i] = 0;
 			}
-
-			g_fsm_status.state = FSM_CALIBRATION_PHASE_1;
+			FSM_Activate_State(FSM_CALIBRATION_PHASE_1);
 			break;
 
 		case FSM_CALIBRATION_PHASE_1:
@@ -964,7 +1179,7 @@ void FSM_Tick_Callback()
 				g_current_electrical_rotation = 0;
 				g_min_encoder_position = g_joint_status.mc_current_motor_position_multiturn; // encoder value
 
-				g_fsm_status.state = FSM_CALIBRATION_PHASE_2;
+				FSM_Activate_State(FSM_CALIBRATION_PHASE_2);
 
 			}
 			else
@@ -995,7 +1210,7 @@ void FSM_Tick_Callback()
 				g_max_electric_rotation_cw 	= g_joint_status.mc_current_electric_rotation; // max electric rotation counter
 
 				g_max_encoder_position = g_joint_status.mc_current_motor_position_multiturn; // max encoder value
-				g_fsm_status.state = FSM_CALIBRATION_PHASE_3;
+				FSM_Activate_State(FSM_CALIBRATION_PHASE_3);
 
 			}
 			else
@@ -1033,7 +1248,7 @@ void FSM_Tick_Callback()
 				}
 
 //					g_joint_configuration.calibration_table_1[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
-				g_fsm_status.state = FSM_CALIBRATION_PHASE_4;
+				FSM_Activate_State(FSM_CALIBRATION_PHASE_4);
 
 			}
 			else
@@ -1048,7 +1263,7 @@ void FSM_Tick_Callback()
 			if (!check_calibration_data_cw(g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size) ||
 				!check_calibration_data_ccw(g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size))
 			{
-				g_fsm_status.state = FSM_CALIBRATION_PHASE_2;
+				FSM_Activate_State(FSM_CALIBRATION_PHASE_2);
 				g_calibration_state = CALIBRATION_TABLE_CONTAINS_ZEROES;
 			}
 			else
@@ -1059,14 +1274,14 @@ void FSM_Tick_Callback()
 				g_joint_configuration.number_of_sectors = (uint16_t) (g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size);
 				g_joint_configuration.reachable_electrical_rotations = g_max_electric_rotation_cw;
 				g_calibration_state = CALIBRATION_OK;
-				g_fsm_status.state = FSM_CALIBRATION_PHASE_5;
+				FSM_Activate_State(FSM_CALIBRATION_PHASE_5);
 			}
 			break;
 
 		case FSM_CALIBRATION_PHASE_5:
 			if (motor_in_position(g_center_encoder_position))
 			{
-				g_fsm_status.state = FSM_CALIBRATION_PHASE_6;
+				FSM_Activate_State(FSM_CALIBRATION_PHASE_6);
 				motor_start(SPEED_MODE, 0);
 				motor_stop();
 
@@ -1124,6 +1339,310 @@ void FSM_Tick_Callback()
 
 			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
 			break;
+#endif
+
+#ifdef ENCODER_PZ2656
+		// ADJUSTMENT DIGITAL
+		case FSM_CALIBRATION_PZ_PHASE_1_STEP_1:
+
+		g_joint_configuration.absolute_encoder_enabled = false;
+//	g_pz2656.reg_st_pre 		= 7832612;
+			g_pz2656.offset 			= 0;
+		
+			pz_write_param(&PZ_SPI_EXT,		0x01);
+
+			pz_write_param(&PZ_FCL, 			0x00);
+			pz_write_param(&PZ_FCS, 			0x00);
+			pz_write_param(&PZ_MT_PDL, 		0x00);
+			pz_write_param(&PZ_ST_PDL, 		0x10);
+			pz_write_param(&PZ_SPI_MT_DL, 0x00);
+			pz_write_param(&PZ_SPI_ST_DL, 0x10);	
+		
+			// Precise Mechanical Alignment
+			pz_write_param(&PZ_AI_P_SEL, 	0x07);
+			pz_write_param(&PZ_AI_S_SEL, 	0x07);
+		
+			pz_write_param(&PZ_AC_ETO, 		0x01);
+			pz_write_param(&PZ_AC_COUNT, 	0x06);
+			pz_write_param(&PZ_AC_SEL1, 	0x0F);
+			pz_write_param(&PZ_AC_SEL2, 	0x00);
+		
+			motor_start(TORQUE_MODE, 0);
+			FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_1_STEP_2);
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_1_STEP_2: // encoder align process - waits to finish
+			if (g_joint_status.stm_state_motor != RUN) 
+			{
+				motor_start(TORQUE_MODE, 0);
+			}
+			else
+			{
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_1_STEP_3);
+			}
+			break;
+			
+		case FSM_CALIBRATION_PZ_PHASE_1_STEP_3:
+			motor_start(SPEED_MODE, 330);
+		
+			pz_write_command(0xB1); // AUTO_ADJ_DIG
+			g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
+		
+			static uint16_t fsm_calib_pz_p1_s3_counter;
+			fsm_calib_pz_p1_s3_counter++;
+			if (fsm_calib_pz_p1_s3_counter > 25000 && g_pz2656.diag == 0x00) { // run 10s
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_1_STEP_4);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_1_STEP_4:
+			motor_start(TORQUE_MODE, 0);
+//			motor_stop();
+		
+			g_pz2656.reg_ai_scale = pz_read_param(&PZ_AI_SCALES); // AI_SCALES
+			g_pz2656.reg_ai_phase = pz_read_param(&PZ_AI_PHASES); // AI_PHASES
+
+			pz_write_param(&PZ_AI_P_SEL, 0x00);
+			pz_write_param(&PZ_AI_S_SEL, 0x00);
+
+			pz_write_param(&PZ_AI_PHASE, g_pz2656.reg_ai_phase);
+			pz_write_param(&PZ_AI_SCALE, g_pz2656.reg_ai_scale);
+
+//			pz_write_command(0x41); // CONF_WRITE_ALL
+//			g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
+			FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_2_STEP_1);
+			break;
+
+		// ADJUSTMENT ANALOG
+		case FSM_CALIBRATION_PZ_PHASE_2_STEP_1:
+			// Filter Configuration before Analog Adjustment
+			pz_write_param(&PZ_IPO_FILT1, 0x6E);
+			pz_write_param(&PZ_IPO_FILT2, 0x04);
+		
+			// Analog Autocalibration
+			pz_write_param(&PZ_AC_ETO, 		0x01);
+			pz_write_param(&PZ_AC_COUNT, 	0x06);
+			pz_write_param(&PZ_AC_SEL1, 	0x0F);
+			pz_write_param(&PZ_AC_SEL2, 	0x00);
+
+			motor_start(TORQUE_MODE, 0);
+			FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_2_STEP_2);
+
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_2_STEP_2: // encoder align process - waits to finish
+			if (g_joint_status.stm_state_motor != RUN) 
+			{
+				motor_start(TORQUE_MODE, 0);
+			}
+			else
+			{
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_2_STEP_3);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_2_STEP_3:
+			motor_start(SPEED_MODE, 330);
+		
+			pz_write_command(0xB0); // AUTO_ADJ_DIG
+			g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
+		
+			static uint16_t fsm_calib_pz_p2_s3_counter;
+			fsm_calib_pz_p2_s3_counter++;
+			if (fsm_calib_pz_p2_s3_counter > 25000 && g_pz2656.diag == 0x00 && g_joint_status.b_safety_input == 0) { // run 10s
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_2_STEP_4);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_2_STEP_4:
+			//motor_start(TORQUE_MODE, 0);
+			motor_stop();
+		
+			g_pz2656.reg_cos_off 	= pz_read_param(&PZ_COS_OFFS); // PZ_COS_OFFS
+			g_pz2656.reg_sin_off 	= pz_read_param(&PZ_SIN_OFFS); // PZ_SIN_OFFS
+			g_pz2656.reg_sc_gain 	= pz_read_param(&PZ_SC_GAINS); // PZ_SC_GAINS
+			g_pz2656.reg_sc_phase	= pz_read_param(&PZ_SC_PHASES); // PZ_SC_PHASES
+
+			pz_write_param(&PZ_COS_OFF, g_pz2656.reg_cos_off); // PZ_COS_OFF
+			pz_write_param(&PZ_SIN_OFF, g_pz2656.reg_sin_off); // PZ_SIN_OFF
+			pz_write_param(&PZ_SC_GAIN, g_pz2656.reg_sc_gain); // PZ_SC_GAIN
+			pz_write_param(&PZ_SC_PHASE, g_pz2656.reg_sc_phase); // PZ_SC_PHASE
+
+			pz_write_param(&PZ_IPO_FILT1, 0xEA);
+			pz_write_param(&PZ_IPO_FILT2, 0x04);
+		
+			g_joint_configuration.absolute_encoder_enabled = true;
+		
+			FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_1);
+			break;
+
+//		// ADJUSTMENT ECC
+//		case FSM_CALIBRATION_PZ_PHASE_3_STEP_1:
+//		
+//			pz_write_param(&PZ_AC_ETO, 		0x01);
+//			pz_write_param(&PZ_AC_COUNT, 	0x06);
+//			pz_write_param(&PZ_AC_SEL1, 	0x0F);
+//			pz_write_param(&PZ_AC_SEL2, 	0x00);
+
+//			pz_write_param(&PZ_ECC_EN, 			0x00);
+
+//			motor_start(TORQUE_MODE, 0);
+//			FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_3_STEP_2);
+
+//			break;
+
+//		case FSM_CALIBRATION_PZ_PHASE_3_STEP_2: // encoder align process - waits to finish
+//			if (g_joint_status.stm_state_motor != RUN) 
+//			{
+//				motor_start(TORQUE_MODE, 0);
+//			}
+//			else
+//			{
+//				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_3_STEP_3);
+//			}
+//			break;
+
+//		case FSM_CALIBRATION_PZ_PHASE_3_STEP_3:
+//			motor_start(SPEED_MODE, 630);
+//		
+//			pz_write_command(0xB3); // AUTO_ADJ_ECC
+//			g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
+//		
+//			static uint16_t fsm_calib_pz_p3_s3_counter;
+//			fsm_calib_pz_p3_s3_counter++;
+//			if (fsm_calib_pz_p3_s3_counter > 25000 && g_pz2656.diag == 0x00) { // run 10s
+//				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_3_STEP_4);
+//			}
+//			break;
+
+//		case FSM_CALIBRATION_PZ_PHASE_3_STEP_4:
+//			motor_stop();
+
+//			g_pz2656.reg_ecc_amp	 	= pz_read_param(&PZ_ECC_AMP); // PZ_ECC_AMP
+//			g_pz2656.reg_ecc_phase 	= pz_read_param(&PZ_ECC_PHASE); // PZ_ECC_PHASE
+//		
+//			pz_write_param(&PZ_ECC_EN, 0x01);
+//			
+//			FSM_Activate_State(FSM_INIT);
+//			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_4_STEP_1:
+			motor_start(SPEED_MODE, 0);
+
+			static uint16_t fsm_calib_pz_p4_s1_counter;
+		
+			if (fsm_calib_pz_p4_s1_counter > CALIBRATION_ZERO_POSITION_COUNTER) {
+				motor_start(SPEED_MODE, 0);
+				// wyliczenie mediany z tablicy
+
+				// Kolejny krok
+				g_joint_configuration.safety_enabled = false;
+				fsm_calib_pz_p4_s1_counter = 0;
+				motor_start(SPEED_MODE, -200);
+
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_4);
+			} else {
+				g_joint_configuration.absolute_encoder_enabled = true;
+				
+				fsm_calib_pz_p4_s1_counter++;
+				// wylaczenie sprawdzanie safety, wlaczenie ruchu ++
+				g_joint_configuration.safety_enabled = false;
+				motor_start(SPEED_MODE, 50);
+				
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_2);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_4_STEP_2:
+			// jak zgasnie safety, zalaczenie sprawdzanie safety
+			if (g_joint_status.b_safety_input == 1) {
+				g_joint_configuration.safety_enabled = true;
+				motor_start(SPEED_MODE, -5);
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_3);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_4_STEP_3:
+			if (g_joint_status.b_safety_input == 0) {
+				g_encoder_position[1][fsm_calib_pz_p4_s1_counter - 1] = g_pz2656.angle;
+				g_joint_configuration.safety_enabled = false;
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_1);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_4_STEP_4:
+			motor_start(SPEED_MODE, 0);
+	
+			if (fsm_calib_pz_p4_s1_counter > CALIBRATION_ZERO_POSITION_COUNTER) {
+				motor_start(SPEED_MODE, 0);
+
+				// wyliczenie mediany z tablicy
+				qsort(g_encoder_position[0], CALIBRATION_ZERO_POSITION_COUNTER, sizeof(uint16_t), cmpfunc);
+				qsort(g_encoder_position[1], CALIBRATION_ZERO_POSITION_COUNTER, sizeof(uint16_t), cmpfunc);
+				
+				g_encoder_position_summary[0][0] = ((float) g_encoder_position[0][0] / UINT16_MAX) * 360.0;
+				g_encoder_position_summary[0][1] = ((float) g_encoder_position[0][CALIBRATION_ZERO_POSITION_COUNTER / 2] / UINT16_MAX) * 360.0;
+				g_encoder_position_summary[0][2] = ((float) g_encoder_position[0][CALIBRATION_ZERO_POSITION_COUNTER - 1] / UINT16_MAX) * 360.0;
+				g_encoder_position_summary[1][0] = ((float) g_encoder_position[1][0] / UINT16_MAX) * 360.0;
+				g_encoder_position_summary[1][1] = ((float) g_encoder_position[1][CALIBRATION_ZERO_POSITION_COUNTER / 2] / UINT16_MAX) * 360.0;
+				g_encoder_position_summary[1][2] = ((float) g_encoder_position[1][CALIBRATION_ZERO_POSITION_COUNTER - 1] / UINT16_MAX) * 360.0;
+
+				g_pz2656.offset = (uint16_t) (((uint32_t) g_encoder_position[0][CALIBRATION_ZERO_POSITION_COUNTER / 2] + (uint32_t) g_encoder_position[1][CALIBRATION_ZERO_POSITION_COUNTER / 2]) / 2);
+				
+				motor_start(TORQUE_MODE, 0);
+				FSM_Activate_State(FSM_CALIBRATION_PZ_FINISH);
+			} else {
+				g_joint_configuration.absolute_encoder_enabled = true;
+				
+				fsm_calib_pz_p4_s1_counter++;
+				// wylaczenie sprawdzanie safety, wlaczenie ruchu ++
+				g_joint_configuration.safety_enabled = false;
+				motor_start(SPEED_MODE, -50);
+				
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_5);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_4_STEP_5:
+			// jak zgasnie safety, zalaczenie sprawdzanie safety
+			if (g_joint_status.b_safety_input == 1) {
+				g_joint_configuration.safety_enabled = true;
+				motor_start(SPEED_MODE, 5);
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_6);
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_PHASE_4_STEP_6:
+			if (g_joint_status.b_safety_input == 0) {
+				g_encoder_position[0][fsm_calib_pz_p4_s1_counter - 1] = g_pz2656.angle;
+				g_joint_configuration.safety_enabled = false;
+				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_4);
+			}
+			break;
+					
+#endif
+
+		case FSM_CALIBRATION_PZ_FINISH:
+			motor_stop();
+
+//			HAL_TIM_Base_Stop_IT(&htim7); // Disable 1 kHz timer
+//			HAL_TIM_Base_Stop_IT(&htim6); // Disable 10 kHz timer
+
+//			if (FLASH_Configuration_Save() == 0)
+//			{
+//				g_joint_configuration.calibration_state = JOINT_CALIBRATED;
+//				FDCAN_Set_Filters();
+//				FSM_Activate_State(FSM_INIT); // CALIBRATION FINISHED - GO TO INIT STATE
+//			}
+//			else
+//			{
+//				FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE); // CALIBRATION FINISHED - GO TO INIT STATE
+//			}
+
+//			HAL_TIM_Base_Start_IT(&htim7); // Enable 1 kHz timer
+//			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
+
+			break;
 
 		default:
 			FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE);
@@ -1131,9 +1650,10 @@ void FSM_Tick_Callback()
 	}
 }
 
-bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition should block changing state to new one - add flag transition is running
+bool FSM_Switch_State_Callback() // FIXME running transition should block changing state to new one - add flag transition is running
 {
-	switch (new_state)
+	
+	switch (g_fsm_status.new_state)
 	{
 
 		case FSM_CALIBRATION_PHASE_0:
@@ -1146,7 +1666,29 @@ bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition shoul
 
 			break;
 		}
+		
+		case FSM_CALIBRATION_PZ_PHASE_1_STEP_1:
+		{
 
+			if (FSM_Get_State() == FSM_INIT)
+			{
+				return FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_1_STEP_1);
+			}
+
+			break;
+		}
+
+		case 171:
+		{
+
+			if (FSM_Get_State() == FSM_INIT)
+			{
+				return FSM_Activate_State(171);
+			}
+
+			break;
+		}
+		
 		default:
 		{
 			break;
@@ -1157,102 +1699,155 @@ bool FSM_Set_State_Callback(uint8_t new_state) // FIXME running transition shoul
 }
 
 // HAL Callbacks
-//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) 
-//{
-//	// SECURITY ALERT
-//    if(GPIO_Pin == SEC_IN_Pin && g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
-//    {
-//    	motor_stop();
-//			FSM_Activate_State(FSM_READY_TO_OPERATE);
-//    }
-//}
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi)
+{
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 
+	switch (buf_rx[0]) {
+		case 0xA6: // read position
+//			g_pz2656.angle = ( (uint32_t) buf_rx[1] << 16 | (uint32_t) buf_rx[2] << 8 | (uint32_t) buf_rx[3]);
+		g_pz2656.readings 	= ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
 
-//void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi) 
-//{
-////	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+		if (g_pz2656.revert_direction) {
+			g_pz2656.angle 			= UINT16_MAX - (uint16_t) ((int32_t) g_pz2656.readings - (int32_t) g_pz2656.offset);
+		} 
+		else
+		{
+			g_pz2656.angle 			= (uint16_t) ((int32_t) g_pz2656.readings - (int32_t) g_pz2656.offset);
+		}
+			
+//		g_joint_status.f_current_joint_position_from_absolute_encoder =  fmod((double) ((double) g_pz2656.angle / UINT16_MAX) * M_TWOPI + M_PI, (double) M_TWOPI) - M_PI ;
+	
+		if (g_pz2656.started == true)
+		{
+			bufsize = 6;
+			buf_tx[0] = 0xA6;
 
-//	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+			for (uint16_t i = 1; i < bufsize; i++) {
+				buf_tx[i] = 0x00;
+			}
 
-//  // TX-RX Done .. Do Something ...
-//	g_counters.spi_txrx_counter++;
+			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+		}
 
-//	g_ma730.angle = (g_spi_rx_data >> 2) & 0b0011111111111111;
+//			// next command - send diagnostic
+//			bufsize = 2;
+//			buf_tx[0] = 0x68;
+//			buf_tx[1] = 0x00;
+//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+			break;
 
-//	g_spi_finished = true;
-//	
-////	if (g_ma730.started)
-////	{
-////		HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+//		case 0x68: // diag
+//			g_pz2656.diag = buf_rx[1];
+//			// next command - send diagnostic
+//			bufsize = 2;
+//			buf_tx[0] = 0x69;
+//			buf_tx[1] = 0x00;
+//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+//			break;
 
-////		if (HAL_SPI_TransmitReceive_IT(&hspi1, (uint8_t * ) &g_spi_tx_data, (uint8_t * ) &g_spi_rx_data, 1) != HAL_OK)
-////		{
-////			Error_Handler();
-////		}
-////	}
+//		case 0x69: // diag
+//			g_pz2656.diag = buf_rx[1] << 8;
+//			// next command - send diagnostic
+//			bufsize = 2;
+//			buf_tx[0] = 0x6A;
+//			buf_tx[1] = 0x00;
+//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+//			break;
 
-//}
+//		case 0x6A: // diag
+//			g_pz2656.diag = buf_rx[1] << 16;
+//			// next command - send diagnostic
+//			bufsize = 2;
+//			buf_tx[0] = 0x6B;
+//			buf_tx[1] = 0x00;
+//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+//			break;
+
+//		case 0x6B: // diag
+//			g_pz2656.diag = buf_rx[1] << 24;
+//			break;
+	}
+
+	g_counters.spi_txrx_counter++;
+
+}
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) 
 {
 	if(htim->Instance == TIM6) 	// 10kHz (5,0) - fast recalculation
 	{
-		g_counters.timer6++;
 		Read_MC_Torque();
 		
 		g_joint_status.b_safety_input = (HAL_GPIO_ReadPin(SEC_IN_GPIO_Port, SEC_IN_Pin) == GPIO_PIN_SET) ? (0) : (1);
-//    if(g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
-//		{
-//		}
-		
-		
-		
-//	// SECURITY ALERT
-//    if(GPIO_Pin == SEC_IN_Pin && g_joint_configuration.safety_enabled == true && g_fsm_status.state == FSM_OPERATION_ENABLE) // If The INT Source Is EXTI Line9 (A9 Pin)
-//    {
-//    	motor_stop();
-//			FSM_Activate_State(FSM_READY_TO_OPERATE);
-//    }
-//}
-		
-		
+				
+		g_counters.timer6++;
 	}
 	
-	if(htim->Instance == TIM7) 	// 10kHz (5,0) - fast recalculation
+	if(htim->Instance == TIM7) 	// 1kHz (5,1) - 1ms - main loop
 	{	
-		g_counters.timer7++;
-
 		// Update data
 		Read_MC_Encoder_1kHz();
 		Update_Data_From_MC(); // Przelicz na jednostki we floatach
 		Read_MC_State(); // Sprawdzenie stanu MC SDK
-		NTC_CalcAvTemp(&g_TempBearingSensorParamsM1); // Odczyt temperatury lozyska
 
-		// Odczyt enkoderow MA730 oraz MC komutacji
-		if (g_joint_configuration.ma730_enabled == true)
+		// Odczyt enkoderow absolutnych
+
+#ifdef ENCODER_MA730
+		if (g_joint_configuration.absolute_encoder_enabled == true)
 		{
 			MA730_ReadRegister(0x1B);
-//			HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
-//			HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &g_spi_tx_data, (uint8_t * ) &g_spi_rx_data, 1, 1);
-//			g_ma730.angle = (g_spi_rx_data >> 2) & 0b0011111111111111;		
-//			HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);		
 		}
+#endif
 
-		if ( FSM_Get_State() > 0)
+#ifdef ENCODER_PZ2656
+		if (g_joint_configuration.absolute_encoder_enabled == true)
+		{
+			if (!g_pz2656.started) {
+				g_pz2656.started = true;
+				bufsize = 6;
+				buf_tx[0] = 0xA6;
+
+				for (uint16_t i = 1; i < bufsize; i++) {
+					buf_tx[i] = 0x00;
+				}
+
+				HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+				HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+			}
+			
+			g_joint_status.f_current_joint_position_from_absolute_encoder =  fmod((double) ((double) g_pz2656.angle / UINT16_MAX) * M_TWOPI + M_PI, (double) M_TWOPI) - M_PI ;
+
+		}
+		else
+		{
+			g_pz2656.started = false;
+		}
+#endif
+
+
+		if ( FSM_Get_State() > 0) // W przypadku, gdy juz CAN uruchomiony, wlaczam obsluge bledów
 		{
 			CheckErrorsAndWarnings(); // Sprawdzenie czy nie wygenerowaly sie jakies bledy czy ostrzezenia
 		}
 
 		g_joint_status.mc_current_electric_rotation = g_current_electrical_rotation; // pobranie informacji aktualnej z MC
 
-		// Reaction on safety in low state
-    if(g_joint_configuration.safety_enabled == true && g_joint_status.b_safety_input == false && g_fsm_status.state == FSM_OPERATION_ENABLE)
-    {
-			FSM_Activate_State(FSM_READY_TO_OPERATE);
-    }
+		// Reakcja na niski stan safety - tylko gdy opcja wlaczona oraz joint w trybie pracy
+		if(g_joint_configuration.safety_enabled == true && g_joint_status.b_safety_input == false && FSM_Get_State() == FSM_OPERATION_ENABLE)
+		{
+				FSM_Activate_State(FSM_READY_TO_OPERATE);
+		}
+
+#ifdef ENCODER_MA730
 		
 		// Estimate joint position from absolute encoder
-		if (g_joint_configuration.ma730_enabled == true && g_joint_configuration.calibration_state == JOINT_CALIBRATED && g_joint_configuration.number_of_sectors > 0)
+		if (g_joint_configuration.absolute_encoder_enabled == true && g_joint_configuration.calibration_state == JOINT_CALIBRATED && g_joint_configuration.number_of_sectors > 0)
 		{
 			// JOINT POSITION ESTIMATION
 			switch (g_joint_status.encoder_position_state)
@@ -1318,15 +1913,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 		}
 
-//		g_temp_current_position_after = g_current_electrical_position;
-//		if (g_temp_current_position_before != g_temp_current_position_after)
-//		{
-//			g_temp_count_errors++;
-//		}
+#endif
 
-
+		// WCHDG - 100Hz
+		if (g_counters.timer7 % 10 == 0) {
+			g_wchdg_ok = WCHDG_CheckTasks();
+			if (!g_wchdg_ok) HAL_NVIC_SystemReset();
+			WCHDG_ResetCounters();
+		}
+		
 		// FSM
-		FSM_Tick() ;			
+		FSM_Switch_State();			
+		FSM_Tick();
+
+		g_counters.timer7++;
+		
 	}
 }
 	
@@ -1362,6 +1963,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 		// UPDATE JOINT INFO ----------------------------------------------------------------------------
 		uint8_t numer_w_szeregu = 0;
 		uint8_t dlugosc_danych_polecenia = 0;
+		uint8_t offset = 0;
 
 		if (!l_unicast)
 		{
@@ -1371,10 +1973,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 		switch (l_cmd) {
 
 			case 0x0: // Wykonaj akcje
-			{
 				dlugosc_danych_polecenia = 2;
 				// int16_t w zaleznosci od trybu pracy - torque, speed
-				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
+				offset = dlugosc_danych_polecenia * numer_w_szeregu;
 
 				int16_t goal;
 				goal  = can_rx_data[offset] << 8;
@@ -1391,9 +1992,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 						break;
 
 					case SPEED_MODE:
-						// GOAL TORQUE
+						// GOAL SPEED
 						// -------------------------------------------------------------------------------------------------
-						// recalculate torque goal data from CAN to floats
+						// recalculate speed goal data from CAN to floats
 						g_joint_command.joint_torque = 0.0;
 						g_joint_command.joint_speed = ((float) goal * MAX_SPEED_THROUGH_CAN) / (float) INT16_MAX; // convert from int16 to float
 						break;
@@ -1449,83 +2050,95 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 				can_tx_data[14] = g_ma730.angle >> 8;
 				can_tx_data[15] = g_ma730.angle;
 				can_tx_data[16] = (uint8_t) g_joint_status.current_motor_temperature;
-				can_tx_data[17] = g_current_sector_number;
-				can_tx_data[18] = g_current_electrical_rotation >> 8;
-				can_tx_data[19] = g_current_electrical_rotation;
+//				can_tx_data[17] = g_current_sector_number;
+//				can_tx_data[18] = g_current_electrical_rotation >> 8;
+//				can_tx_data[19] = g_current_electrical_rotation;
 				can_tx_header.DataLength = FDCAN_DLC_BYTES_20;
 
 				break;
-			}
 
 			case 0x1: // Zmien stan FSM
-			{
 				dlugosc_danych_polecenia = 1;
 				// uint8_t - FSM
-				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
+				offset = dlugosc_danych_polecenia * numer_w_szeregu;
 
-				FSM_Set_State(can_rx_data[offset]);
+				FSM_Set_New_State(can_rx_data[offset]);
+				//g_fsm_status.current_state = can_rx_data[offset];
 
 				can_tx_data[0] = FSM_Get_State();
 
 				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
 				break;
-			}
 
-//			case 0x9: // Dane pozycjonujace
-//			{
-//				int32_t l_temp_1 = (int32_t) (g_temp_1 * (float) INT32_MAX);
-//				int32_t l_temp_3 = (int32_t) (g_temp_3 * (float) INT32_MAX);
-//				int32_t l_temp_4 = (int32_t) (g_temp_4 * (float) INT32_MAX);
+			case 0x2: // Zapis configuracji na FLASH
+				can_tx_data[0] = 0;
 
-//				can_tx_data[0] 	= l_temp_1 >> 24;
-//				can_tx_data[1] 	= l_temp_1 >> 16;
-//				can_tx_data[2] 	= l_temp_1 >> 8;
-//				can_tx_data[3] 	= l_temp_1;
+				if (FSM_Get_State() == FSM_INIT)
+				{
+					dlugosc_danych_polecenia = 0;
+					offset = dlugosc_danych_polecenia * numer_w_szeregu;
+					
+					if (FLASH_Configuration_Save() == 0) can_tx_data[0] = 1; // Zapis sie powiódl
+					
+				}
+				
 
-//				can_tx_data[4] 	= g_temp_2 >> 8;
-//				can_tx_data[5] 	= g_temp_2;
+				// jak sie powiedzie to 1
 
-//				can_tx_data[6] 	= l_temp_3 >> 24;
-//				can_tx_data[7] 	= l_temp_3 >> 16;
-//				can_tx_data[8] 	= l_temp_3 >> 8;
-//				can_tx_data[9] 	= l_temp_3;
+				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
+				break;
+////			case 0x9: // Dane pozycjonujace
+////			{
+////				int32_t l_temp_1 = (int32_t) (g_temp_1 * (float) INT32_MAX);
+////				int32_t l_temp_3 = (int32_t) (g_temp_3 * (float) INT32_MAX);
+////				int32_t l_temp_4 = (int32_t) (g_temp_4 * (float) INT32_MAX);
 
-//				can_tx_data[10] = l_temp_4 >> 24;
-//				can_tx_data[11] = l_temp_4 >> 16;
-//				can_tx_data[12] = l_temp_4 >> 8;
-//				can_tx_data[13] = l_temp_4;
+////				can_tx_data[0] 	= l_temp_1 >> 24;
+////				can_tx_data[1] 	= l_temp_1 >> 16;
+////				can_tx_data[2] 	= l_temp_1 >> 8;
+////				can_tx_data[3] 	= l_temp_1;
 
-//				can_tx_data[14] = g_temp_5 >> 8;
-//				can_tx_data[15] = g_temp_5;
+////				can_tx_data[4] 	= g_temp_2 >> 8;
+////				can_tx_data[5] 	= g_temp_2;
 
-//				can_tx_data[16] = g_temp_6 >> 8;
-//				can_tx_data[17] = g_temp_6;
+////				can_tx_data[6] 	= l_temp_3 >> 24;
+////				can_tx_data[7] 	= l_temp_3 >> 16;
+////				can_tx_data[8] 	= l_temp_3 >> 8;
+////				can_tx_data[9] 	= l_temp_3;
 
-//				can_tx_data[18] = g_temp_7 >> 8;
-//				can_tx_data[19] = g_temp_7;
+////				can_tx_data[10] = l_temp_4 >> 24;
+////				can_tx_data[11] = l_temp_4 >> 16;
+////				can_tx_data[12] = l_temp_4 >> 8;
+////				can_tx_data[13] = l_temp_4;
 
-////				dlugosc_danych_polecenia = 1;
-////				// uint8_t - FSM
-////				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
-////
-////				FSM_Set_State(can_rx_data[offset]);
-////
-////				can_tx_data[0] = FSM_Get_State();
-////
-////				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
-//				can_tx_header.DataLength = FDCAN_DLC_BYTES_20;
-//				break;
-//			}
+////				can_tx_data[14] = g_temp_5 >> 8;
+////				can_tx_data[15] = g_temp_5;
+
+////				can_tx_data[16] = g_temp_6 >> 8;
+////				can_tx_data[17] = g_temp_6;
+
+////				can_tx_data[18] = g_temp_7 >> 8;
+////				can_tx_data[19] = g_temp_7;
+
+//////				dlugosc_danych_polecenia = 1;
+//////				// uint8_t - FSM
+//////				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
+//////
+//////				FSM_Set_State(can_rx_data[offset]);
+//////
+//////				can_tx_data[0] = FSM_Get_State();
+//////
+//////				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
+////				can_tx_header.DataLength = FDCAN_DLC_BYTES_20;
+////				break;
+////			}
 
 			case 0xA: // RESET
-			{
 				l_send_response = false;
 				NVIC_SystemReset();
 				break;
-			}
 
 			case 0xB: // SET CAN ID
-			{
 				if (FSM_Get_State() == FSM_INIT)
 				{
 					dlugosc_danych_polecenia = 1;
@@ -1543,16 +2156,15 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					can_tx_data[0] = 0;
 				}
 
-
 				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
 				break;
-			}
+
+#ifdef ENCODER_MA730
 
 			case 0xC: // GET MA730 SECTOR VALUE
-			{
 				dlugosc_danych_polecenia = 2;
 				// uint8_t - FSM
-				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
+				offset = dlugosc_danych_polecenia * numer_w_szeregu;
 
 //				uint16_t sector_id = ((uint16_t) can_rx_data[offset]) << 8 + can_rx_data[offset + 1];
 				int16_t sector_id;
@@ -1566,19 +2178,20 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 
 				can_tx_header.DataLength = FDCAN_DLC_BYTES_4;
 				break;
-			}
+#endif
 
 			case 0xF: // Konfiguracja
-			{
 				dlugosc_danych_polecenia = 2;
 				// uint8_t tryb pracy
-				uint8_t offset = dlugosc_danych_polecenia * numer_w_szeregu;
+				offset = dlugosc_danych_polecenia * numer_w_szeregu;
 				if (FSM_Get_State() == FSM_INIT || FSM_Get_State() == FSM_READY_TO_OPERATE)
 				{
 					g_joint_command.working_mode = can_rx_data[offset];
-					g_joint_configuration.working_area_constrain_enabled = (can_rx_data[offset + 1] & 0x01);
-					g_joint_configuration.ma730_enabled = (can_rx_data[offset + 1] & 0x02) >> 1;
-					g_joint_configuration.safety_enabled = (can_rx_data[offset + 1] & 0x04) >> 2;
+					g_joint_configuration.working_area_constrain_enabled 	= (can_rx_data[offset + 1] & 0x01);
+					g_joint_configuration.absolute_encoder_enabled 				= (can_rx_data[offset + 1] & 0x02) >> 1;
+					g_joint_configuration.safety_enabled 									= (can_rx_data[offset + 1] & 0x04) >> 2;
+					g_joint_configuration.canbus_watchdog_enabled 				= (can_rx_data[offset + 1] & 0x08) >> 3;
+					
 					can_tx_data[0] = 1;
 				}
 				else
@@ -1588,13 +2201,10 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 
 				can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
 				break;
-			}
 
 			default:
-			{
 				l_send_response = false;
-
-			}
+				break;
 
 		}
 
@@ -1613,42 +2223,28 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 	}
 }
 
-//void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) 
-//{
-////	g_counter2++;
-//}
-
-
-
-//void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) 
-//{
-////	g_counter2++;
-
-//}
-
 // PZ
+//#pragma GCC push_options
+//#pragma GCC optimize ("O0")
+#ifdef ENCODER_PZ2656
 void pz_spi_transfer(uint8_t *data_tx, uint8_t *data_rx, uint16_t datasize) {
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
 
-  for (uint16_t i = 0; i < datasize; i++) {
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+
 #if PCB_VERSION >= 0x030000
-//		HAL_SPI_TransmitReceive(&hspi1, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
+		HAL_SPI_TransmitReceive(&hspi1, data_tx, data_rx, datasize, 1);
 #else
 //		HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
-#endif	
-	}
+#endif
 
-	
-//    digitalWrite(NCS_PIN, LOW);
-// 
-//    for (uint16_t i = 0; i < datasize; i++)
-//        data_rx[i] = SPI.transfer(data_tx[i]);
-// 
-//    digitalWrite(NCS_PIN, HIGH);
-	
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);	
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 }
 
+#endif
+
+//#pragma GCC pop_options
+
+#ifdef ENCODER_MA730
 // MA730
 void MA730_ReadRegister(uint8_t reg_number) 
 {
@@ -1659,7 +2255,7 @@ void MA730_ReadRegister(uint8_t reg_number)
 
 	for (uint16_t i = 0; i < 24; i++) __NOP();  // wait about 150ns
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
 
 	for (uint16_t i = 0; i < 130; i++) __NOP();  // wait about 80ns
 
@@ -1669,11 +2265,11 @@ void MA730_ReadRegister(uint8_t reg_number)
 #else
 	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
 #endif
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 
 	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
 
 	for (uint16_t i = 0; i < 13; i++) __NOP();  // wait about 80ns
 
@@ -1688,7 +2284,7 @@ void MA730_ReadRegister(uint8_t reg_number)
 
 //	g_MA730_read_buffer = register_value >> 8;
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 
 	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
 
@@ -1761,7 +2357,7 @@ void MA730_ReadAngle()
 
 //	for (uint16_t i = 0; i < 24; i++) NOP;  // wait about 150ns
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
 
 //	for (uint16_t i = 0; i < 13; i++) NOP;  // wait about 80ns
 
@@ -1772,7 +2368,7 @@ void MA730_ReadAngle()
 	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
 #endif
 	
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 
 //	for (uint16_t i = 0; i < 12; i++) NOP;  // wait about 80ns
 
@@ -1789,7 +2385,7 @@ void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value)
 
 	for (uint16_t i = 0; i < 24; i++) __NOP();  // wait about 150ns
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
 
 	for (uint16_t i = 0; i < 130; i++) __NOP();  // wait about 80ns
 
@@ -1800,11 +2396,11 @@ void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value)
 	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &angle_value, 1, 1);
 #endif
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 
 	HAL_Delay(20); // Wait 20 ms after write command
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
 
 	for (uint16_t i = 0; i < 13; i++) __NOP();  // wait about 80ns
 
@@ -1817,12 +2413,12 @@ void MA730_WriteRegister(uint8_t reg_number, uint8_t reg_value)
 	HAL_SPI_TransmitReceive(&hspi2, (uint8_t * ) &send_data, (uint8_t * ) &register_value, 1, 1);
 #endif
 
-	HAL_GPIO_WritePin(MA730_CS_GPIO_Port, MA730_CS_Pin, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 
 	for (uint16_t i = 0; i < 120; i++) __NOP();  // wait about 750ns
 
 }
-
+#endif
 
 
 // MC SDK Override Functions
@@ -1847,7 +2443,7 @@ int16_t NTC_GetAvTemp_C( NTC_Handle_t * pHandle )
 uint16_t NTC_CalcAvTemp( NTC_Handle_t * pHandle ) 
 {
 	
-  uint32_t wtemp;
+//  uint32_t wtemp;
   uint16_t hAux;
 
   if ( pHandle->bSensorType == REAL_SENSOR )

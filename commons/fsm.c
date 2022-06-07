@@ -1,16 +1,16 @@
 #include "fsm.h"
 
 __attribute__((weak)) volatile FSMStatus_t 	g_fsm_status = {
-	.state = FSM_START,
-	.state_is_running = false,
-	.transition_is_running = false,
+	.current_state = FSM_START,
+	.new_state = FSM_START,
+//	.state_is_running = false,
+//	.transition_is_running = false,
 };
 
 // LOCAL FUNCTIONS DEFINITIONS
 //FSM_State_t FSM_Get_State(void);
 uint8_t FSM_Get_State(void);
 //bool FSM_Set_State(FSM_State_t new_state);
-bool FSM_Set_State(uint8_t new_state);
 //bool FSM_Activate_State(FSM_State_t new_state);
 bool FSM_Activate_State(uint8_t new_state);
 //bool FSM_Activate_Transition(FSM_State_t new_transition);
@@ -24,7 +24,8 @@ void FSM_Action()
 //bool FSM_Activate_State(FSM_State_t new_state) 
 bool FSM_Activate_State(uint8_t new_state) 
 {
-	g_fsm_status.state = new_state;
+	g_fsm_status.current_state = new_state;
+	g_fsm_status.new_state = new_state;
 	return true;
 }
 
@@ -32,7 +33,8 @@ bool FSM_Activate_State(uint8_t new_state)
 //bool FSM_Activate_Transition(FSM_State_t new_transition) 
 bool FSM_Activate_Transition(uint8_t new_transition) 
 {
-	g_fsm_status.state = new_transition;
+	g_fsm_status.current_state = new_transition;
+	g_fsm_status.new_state = new_transition;
 	return true;
 }
 
@@ -40,12 +42,11 @@ bool FSM_Activate_Transition(uint8_t new_transition)
 //FSM_State_t FSM_Get_State(void) 
 uint8_t FSM_Get_State(void) 
 {
-	
-	return g_fsm_status.state;
+	return g_fsm_status.current_state;
 }
 
 //__attribute__((weak)) bool FSM_Set_State_Callback(FSM_State_t new_state) {
-__attribute__((weak)) bool FSM_Set_State_Callback(uint8_t new_state) 
+__attribute__((weak)) bool FSM_Switch_State_Callback() 
 {
 	return false;
 }
@@ -100,7 +101,7 @@ __attribute__((weak)) bool FSM_TRANSITION_OPERATION_ENABLE_TO_READY_TO_OPERATE_C
 	return true;
 }
 
-__attribute__((weak)) bool FSM_TRANSITION_OPERATION_ENABLE_TO_INIT_Callback() 
+__attribute__((weak)) bool FSM_TRANSITION_READY_TO_OPERATE_TO_INIT_Callback() 
 {
 	return true;
 }
@@ -125,10 +126,22 @@ __attribute__((weak)) void FSM_Tick_Callback()
 	}
 }
 
-//bool FSM_Set_State(FSM_State_t new_state) 
-bool FSM_Set_State(uint8_t new_state) 
+bool FSM_Set_New_State(uint8_t new_state)
 {
-	switch (new_state)
+	g_fsm_status.new_state = new_state;
+
+	return true;
+}
+
+bool FSM_Switch_State() 
+{
+
+	if (g_fsm_status.new_state == g_fsm_status.current_state)
+	{
+		return true;
+	}
+	
+	switch (g_fsm_status.new_state)
 	{
 		case FSM_START:
 		{
@@ -147,9 +160,9 @@ bool FSM_Set_State(uint8_t new_state)
 				return FSM_Activate_Transition(FSM_TRANSITION_FAULT_TO_INIT);
 			}
 
-			if (FSM_Get_State() == FSM_OPERATION_ENABLE)
+			if (FSM_Get_State() == FSM_READY_TO_OPERATE)
 			{
-				return FSM_Activate_Transition(FSM_TRANSITION_OPERATION_ENABLE_TO_INIT);
+				return FSM_Activate_Transition(FSM_TRANSITION_READY_TO_OPERATE_TO_INIT);
 			}
 			break;
 		}
@@ -210,7 +223,7 @@ bool FSM_Set_State(uint8_t new_state)
 
 		default:
 		{
-			return FSM_Set_State_Callback(new_state);
+			return FSM_Switch_State_Callback();
 			break;
 		}
 	}	
@@ -222,6 +235,7 @@ void FSM_Tick()
 {
 	switch (FSM_Get_State()) {
 
+		// STATES
 		case FSM_START:
 			FSM_START_Callback(); 
 			FSM_Activate_Transition(FSM_TRANSITION_START_TO_INIT); // auto
@@ -253,6 +267,7 @@ void FSM_Tick()
 				FSM_Activate_State(FSM_INIT);
 			break;
 
+		// TRANSISTIONS
 		case FSM_TRANSITION_INIT_TO_READY_TO_OPERATE:
 			if (FSM_TRANSITION_INIT_TO_READY_TO_OPERATE_Callback())
 				FSM_Activate_State(FSM_READY_TO_OPERATE);
@@ -269,8 +284,8 @@ void FSM_Tick()
 			//motor_stop();
 			break;
 
-		case FSM_TRANSITION_OPERATION_ENABLE_TO_INIT:
-			if (FSM_TRANSITION_OPERATION_ENABLE_TO_INIT_Callback()) // zadanie sie skonczylo
+		case FSM_TRANSITION_READY_TO_OPERATE_TO_INIT:
+			if (FSM_TRANSITION_READY_TO_OPERATE_TO_INIT_Callback()) // zadanie sie skonczylo
 				FSM_Activate_State(FSM_INIT);
 			break;
 

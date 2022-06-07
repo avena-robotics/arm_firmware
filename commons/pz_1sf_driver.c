@@ -220,9 +220,12 @@ const struct pz_param PZ_MFG_ID_1 = { .addr = 0x7E, .pos = 7, .len = 8, };
 const struct pz_param PZ_MFG_ID_0 = { .addr = 0x7F, .pos = 7, .len = 8, };
 
 /* globals */
-static uint8_t buf_tx[0xFF + 3];
-static uint8_t buf_rx[0xFF + 3];
-static uint16_t bufsize;
+extern uint8_t buf_tx[0xFF + 3];
+extern uint8_t buf_rx[0xFF + 3];
+extern uint16_t bufsize;
+
+__attribute__ ((weak)) void pz_spi_transfer(uint8_t *data_tx, uint8_t *data_rx, uint16_t datasize) {
+}
 
 /**
  * @brief This function is used to read data from consecutive registers in the on-chip RAM.
@@ -242,7 +245,7 @@ void pz_read_registers(uint8_t addr, uint8_t *data_rx, uint8_t datasize) {
 		buf_tx[i] = 0x00;
 	}
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 
 	for (uint8_t j = 0; j < datasize; j++) {
 		data_rx[j] = buf_rx[j + 3];
@@ -266,7 +269,7 @@ void pz_write_registers(uint8_t addr, const uint8_t *data_tx, uint8_t datasize) 
 		buf_tx[i + 2] = data_tx[i];
 	}
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 }
 
 /**
@@ -288,7 +291,7 @@ void pz_read_position(uint8_t *data_rx, uint8_t datasize) {
 		buf_tx[i] = 0x00;
 	}
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 
 	for (uint8_t j = 0; j < datasize; j++) {
 		data_rx[j] = buf_rx[j + 1];
@@ -308,7 +311,7 @@ void pz_write_command(PZ_COMMANDS command) {
 	buf_tx[0] = PZ_OPCODE_WRITE_COMMAND;
 	buf_tx[1] = command;
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 }
 
 /**
@@ -325,7 +328,7 @@ void pz_read_diagnosis(uint8_t data_rx[8]) {
 		buf_tx[i] = 0x00;
 	}
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 
 	for (uint16_t j = 0; j < bufsize - 2; j++) {
 		data_rx[j] = buf_rx[j + 2];
@@ -346,7 +349,7 @@ void pz_request_data_from_i2c_slave(uint8_t addr) {
 	buf_tx[0] = PZ_OPCODE_REQUEST_DATA_FROM_I2C_SLAVE;
 	buf_tx[1] = addr;
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 }
 
 /**
@@ -365,7 +368,7 @@ void pz_transmit_data_to_i2c_slave(uint8_t addr, uint8_t data) {
 	buf_tx[1] = addr;
 	buf_tx[2] = data;
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 }
 
 /**
@@ -383,7 +386,7 @@ void pz_get_transaction_info(uint8_t *status_rx, uint8_t *data_rx) {
 	buf_tx[1] = 0x00;
 	buf_tx[2] = 0x00;
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 
 	*status_rx = buf_rx[1];
 	*data_rx = buf_rx[2];
@@ -403,7 +406,7 @@ void pz_activate_slave_in_chain(uint8_t ra_pa_configuration_byte) {
 	buf_tx[0] = PZ_OPCODE_ACTIVATE_SLAVE_IN_CHAIN;
 	buf_tx[1] = ra_pa_configuration_byte;
 
-	pz_spi_transfer(buf_tx, buf_rx, bufsize);
+	pz_spi_transfer( (uint8_t *) buf_tx, (uint8_t *) buf_rx, bufsize);
 }
 
 /**
