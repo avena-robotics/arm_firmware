@@ -22,7 +22,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "commons_uj.h"
+#include "universal_joint.h"
+#include "fsm.h"
 
 /* USER CODE END Includes */
 
@@ -69,6 +70,7 @@ DMA_HandleTypeDef hdma_usart1_tx;
 /* USER CODE BEGIN PV */
 extern Counters_Handle_t volatile g_counters;
 uint8_t g_reg_80;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -157,35 +159,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  g_current_torque 			= MC_GetPhaseCurrentAmplitudeMotor1();
-//	  	g_stm_state_motor 			= MC_GetSTMStateMotor1();
-//	  	g_mc_current_faults_motor 	= MC_GetCurrentFaultsMotor1();
-//
-//	  	if (g_stm_state_motor == FAULT_NOW)
-//	  	{
-//	  		HAL_GPIO_WritePin(SEC_OUT_GPIO_Port, SEC_OUT_Pin, GPIO_PIN_SET);
-//	  	}
-//	  	g_mc_occured_faults_motor 	= MC_GetOccurredFaultsMotor1();
-//
-//
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 1, 1, &g_reg_1, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 2, 1, &g_reg_2, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 7, 1, &g_reg_7, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 8, 1, &g_reg_8, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 9, 1, &g_reg_9, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0xA, 1, &g_reg_A, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0xB, 1, &g_reg_B, sizeof(g_reg_1), HAL_MAX_DELAY);
-////	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0XC, 1, &g_reg_C, sizeof(g_reg_1), HAL_MAX_DELAY);
-//	  	HAL_I2C_Mem_Read(&hi2c3, 0b10001110, 0x80, 1, &g_reg_80, sizeof(g_reg_80), 100);
-//
-////	  	HAL_I2C_Mem_Read_IT(&hi2c3, 0b10001110, 0x80, 1, &g_reg_80, sizeof(g_reg_1));
-//
-//	  	g_gd_nfault = (HAL_GPIO_ReadPin(GPIOE, GD_NFAULT_Pin) == GPIO_PIN_RESET) ? (0) : (1);
-//	  	g_gd_ready = (HAL_GPIO_ReadPin(GPIOE, GD_READY_Pin) == GPIO_PIN_RESET) ? (0) : (1);
-//
-//	  	MC_ProgramTorqueRampMotor1(g_goal, 0);
-//	  	MC_StartMotor1();
-//	  	g_counter++;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -1086,7 +1059,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, SEC_OUT_Pin|MA730_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, SEC_OUT_Pin|ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GD_WAKE_GPIO_Port, GD_WAKE_Pin, GPIO_PIN_SET);
@@ -1097,8 +1070,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(SEC_IN_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : SEC_OUT_Pin MA730_CS_Pin */
-  GPIO_InitStruct.Pin = SEC_OUT_Pin|MA730_CS_Pin;
+  /*Configure GPIO pins : SEC_OUT_Pin ABSOLUTE_ENCODER_CS_Pin */
+  GPIO_InitStruct.Pin = SEC_OUT_Pin|ABSOLUTE_ENCODER_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

@@ -64,8 +64,8 @@ void Error_Handler(void);
 #define SEC_IN_GPIO_Port GPIOC
 #define SEC_OUT_Pin GPIO_PIN_15
 #define SEC_OUT_GPIO_Port GPIOC
-#define MA730_CS_Pin GPIO_PIN_3
-#define MA730_CS_GPIO_Port GPIOC
+#define ABSOLUTE_ENCODER_CS_Pin GPIO_PIN_3
+#define ABSOLUTE_ENCODER_CS_GPIO_Port GPIOC
 #define M1_BUS_VOLTAGE_Pin GPIO_PIN_0
 #define M1_BUS_VOLTAGE_GPIO_Port GPIOA
 #define M1_CURR_SHUNT_U_Pin GPIO_PIN_1

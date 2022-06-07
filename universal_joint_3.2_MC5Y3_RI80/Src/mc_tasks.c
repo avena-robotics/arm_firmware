@@ -82,7 +82,11 @@ uint8_t bMCBootCompleted = 0;
 int16_t g_current_electrical_position;
 int16_t g_previous_electrical_position;
 int16_t g_current_electrical_rotation;
+uint16_t g_high_frequency_task_running = 0;
+uint16_t g_medium_frequency_task_running = 0;
+uint16_t g_safety_task = 0;
 
+extern NTC_Handle_t   g_TempBearingSensorParamsM1;
 /* USER CODE END Private Variables */
 
 /* Private functions ---------------------------------------------------------*/
@@ -519,6 +523,7 @@ __weak void TSK_MediumFrequencyTaskM1(void)
   }
 
   /* USER CODE BEGIN MediumFrequencyTask M1 6 */
+	g_medium_frequency_task_running++;
 
   /* USER CODE END MediumFrequencyTask M1 6 */
 }
@@ -711,6 +716,7 @@ __weak uint8_t TSK_HighFrequencyTask(void)
 		g_current_electrical_rotation--;
 	}
 
+	g_high_frequency_task_running++;
   /* USER CODE END HighFrequencyTask 1 */
 
   GLOBAL_TIMESTAMP++;
@@ -793,6 +799,7 @@ __weak void TSK_SafetyTask(void)
     RCM_ExecUserConv ();
   /* USER CODE BEGIN TSK_SafetyTask 1 */
 
+	g_safety_task++;
   /* USER CODE END TSK_SafetyTask 1 */
   }
 }
@@ -878,7 +885,7 @@ __weak void TSK_SafetyTask_LSON(uint8_t bMotor)
   CodeReturn |= PWMC_CheckOverCurrent(pwmcHandle[bMotor]);                    /* for fault. It return MC_BREAK_IN or MC_NO_FAULTS
                                                                                 (for STM32F30x can return MC_OVER_VOLT in case of HW Overvoltage) */
   /* USER CODE BEGIN TSK_SafetyTask_LSON 1 */
-
+	NTC_CalcAvTemp(&g_TempBearingSensorParamsM1);
   /* USER CODE END TSK_SafetyTask_LSON 1 */
   if(bMotor == M1)
   {
