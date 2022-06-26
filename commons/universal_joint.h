@@ -123,11 +123,11 @@ typedef struct PZ2656_Handle {
 	uint16_t reg_ecc_phase;
 
 	bool 		reg_spi_ext;
-	uint32_t reg_st_pre;
-	uint32_t reg_st_off;
+//	uint32_t reg_st_pre;
+//	uint32_t reg_st_off;
 
 	uint32_t diag;
-} __attribute__ ((packed)) PZ2656_Handle_t;
+} PZ2656_Handle_t;
 
 typedef struct Counters_Handle {
 	uint32_t main_loop;
