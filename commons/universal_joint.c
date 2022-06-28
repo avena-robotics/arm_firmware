@@ -227,7 +227,7 @@ void UJ_Init()
 #endif
 
 #if PCB_VERSION >= 0x030300
-	if (g_registers[0].flash == 0) // pusta konfiguracja
+	if (g_registers[0].data[0] == 0xFFFF) // pusta konfiguracja
 	{
 		uint16_t sdk_version_1 = (0x5) << 8 | (0x5a);
 		uint16_t sdk_version_2 = (0x3) << 8 | (0x0);
@@ -238,24 +238,30 @@ void UJ_Init()
 		uint16_t motor_type = MOTOR_TYPE;
 		uint16_t gear_ratio = 121;
 
-		uint16_t revert_direction = (0x1);
+		uint16_t revert_direction = 0x01;
+		uint16_t offset = 0x00;
 
-		uint16_t can_id = 0x00;
-
-		REG_Set(0x00, &sdk_version_1); // offset
-		REG_Set(0x01, &sdk_version_2); // offset
-		REG_Set(0x02, &pcb_version_1); // offset
-		REG_Set(0x03, &pcb_version_2); // offset
-		REG_Set(0x06, &motor_type); // offset
-		REG_Set(0x07, &gear_ratio); // offset
+		REG_Set(0x00, &sdk_version_1); // SDK_1
+		REG_Set(0x01, &sdk_version_2); // SDK_2
+		REG_Set(0x02, &pcb_version_1); // PCB_1
+		REG_Set(0x03, &pcb_version_2); // PCB_2
+		REG_Set(0x06, &motor_type); // MOTOR_TYPE
+		REG_Set(0x07, &gear_ratio); // 121
 		
 		REG_Set(0x21, &revert_direction); // revert_direction
-
-		REG_Set(0x40, &can_id); // default can_id = 0
+		REG_Set(0x22, &offset); // offset
 
 		FLASH_Configuration_Save();
 	}
 #endif
+
+if (REG_Get_uint16(0x40) == 0xFFFF)	
+{
+		uint16_t can_id = 0x00;
+		REG_Set(0x40, &can_id); // default can_id = 0
+
+		FLASH_Configuration_Save();
+}
 	
 #ifdef ENCODER_PZ2656
 	// Konfiguracja stala
@@ -271,34 +277,18 @@ void UJ_Init()
 	// DIGITAL ALIGNMENT
 	pz_write_param(&PZ_AI_SCALE, REG_Get_uint16(0x18));
 	pz_write_param(&PZ_AI_PHASE, REG_Get_uint16(0x19));
-
-	// sprawdzenie
-	g_pz2656.reg_ai_phase 	= pz_read_param(&PZ_AI_PHASE);
-	g_pz2656.reg_ai_scale 	= pz_read_param(&PZ_AI_SCALE);
-
 	// ANALOG ALIGNMENT
 	pz_write_param(&PZ_COS_OFF,  REG_Get_uint16(0x1A));
 	pz_write_param(&PZ_SIN_OFF,  REG_Get_uint16(0x1B));
 	pz_write_param(&PZ_SC_GAIN,  REG_Get_uint16(0x1C));
 	pz_write_param(&PZ_SC_PHASE, REG_Get_uint16(0x1D));
 
+	g_pz2656.reg_ai_phase 	= pz_read_param(&PZ_AI_PHASE);
+	g_pz2656.reg_ai_scale 	= pz_read_param(&PZ_AI_SCALE);
 	g_pz2656.reg_cos_off 		= pz_read_param(&PZ_COS_OFF); // PZ_COS_OFF
 	g_pz2656.reg_sin_off 		= pz_read_param(&PZ_SIN_OFF); // PZ_SIN_OFF
 	g_pz2656.reg_sc_gain 		= pz_read_param(&PZ_SC_GAIN); // PZ_SC_GAIN
 	g_pz2656.reg_sc_phase		= pz_read_param(&PZ_SC_PHASE); // PZ_SC_PHASE
-
-//	// PZ2656 Init
-////	pz_write_command(0x40); // CONF_READ_ALL
-////	g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
-
-////	g_pz2656.reg_st_pre 		= 0x00F78C25;
-////	pz_write_param(&PZ_ST_PRE, g_pz2656.reg_st_pre);
-
-////	g_pz2656.reg_st_off 		= 0x00F78C25;
-////	pz_write_param(&PZ_ST_OFF, g_pz2656.reg_st_off);
-
-////	pz_write_command(0x80); // MTST_PRESET
-////	g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
 
 	g_pz2656.reg_fcs 				= pz_read_param(&PZ_FCL);
 	g_pz2656.reg_fcs 				= pz_read_param(&PZ_FCS);
@@ -308,32 +298,7 @@ void UJ_Init()
 	g_pz2656.reg_spi_mt_dl 	= pz_read_param(&PZ_SPI_MT_DL);
 	g_pz2656.reg_spi_st_dl 	= pz_read_param(&PZ_SPI_ST_DL);
 
-//	// Data readed from FLASH
-//	// DIGITAL ALIGNMENT
-//	g_pz2656.reg_ai_phase 	= pz_read_param(&PZ_AI_PHASE);
-//	g_pz2656.reg_ai_scale 	= pz_read_param(&PZ_AI_SCALE);
-
-//	// ANALOG ALIGNMENT
-//	g_pz2656.reg_cos_off 		= pz_read_param(&PZ_COS_OFF); // PZ_COS_OFF
-//	g_pz2656.reg_sin_off 		= pz_read_param(&PZ_SIN_OFF); // PZ_SIN_OFF
-//	g_pz2656.reg_sc_gain 		= pz_read_param(&PZ_SC_GAIN); // PZ_SC_GAIN
-//	g_pz2656.reg_sc_phase		= pz_read_param(&PZ_SC_PHASE); // PZ_SC_PHASE
-//	
-//	g_pz2656.offset = 30356;
 //	g_pz2656.revert_direction = 1;
-
-//	REG_Set(0x5A, &param3); // offset
-//	REG_Set(0x5B, &param4); // offset
-//	REG_Set(0x5C, &param5); // offset
-//	REG_Set(0x5D, &param6); // offset
-//	REG_Set(0x59, (uint16_t *) &g_pz2656.reg_ai_phase); // offset
-//	REG_Set(0x5A, (uint16_t *) &g_pz2656.reg_cos_off); // offset
-//	REG_Set(0x5B, (uint16_t *) &g_pz2656.reg_sin_off); // offset
-//	REG_Set(0x5C, (uint16_t *) &g_pz2656.reg_sc_gain); // offset
-//	REG_Set(0x5D, (uint16_t *) &g_pz2656.reg_sc_phase); // offset
-////	REG_Set(0x5E, (uint16_t *) &g_pz2656.offset); // offset
-////	REG_Set(0x5F, (uint16_t *) &g_pz2656.offset); // offset
-//	REG_Set(0x60, (uint16_t *) &g_pz2656.offset); // offset
 #endif
 
 	HAL_Delay(100); // Wait to initialize all pheripherals
@@ -910,6 +875,8 @@ uint32_t FLASH_Configuration_Save()
 	g_joint_configuration.absolute_encoder_enabled = false;
 	g_pz2656.started = false;
 	volatile uint32_t error = 0;
+	HAL_TIM_Base_Stop_IT(&htim6); 	// Enable 10 kHz timer for fast calculation
+	HAL_TIM_Base_Stop_IT(&htim7);  	// Enable  1 kHz timer for FSM
 
 	HAL_FLASH_Unlock();
 
@@ -1038,6 +1005,9 @@ uint32_t FLASH_Configuration_Save()
 #endif
 
 HAL_FLASH_Lock();
+
+	HAL_TIM_Base_Start_IT(&htim6); 	// Enable 10 kHz timer for fast calculation
+	HAL_TIM_Base_Start_IT(&htim7);  	// Enable  1 kHz timer for FSM
 
 	return error;
 }
@@ -1434,11 +1404,10 @@ void FSM_Tick_Callback()
 		case FSM_CALIBRATION_PZ_PHASE_1_STEP_1:
 
 			g_joint_configuration.absolute_encoder_enabled = false; 
-//	g_pz2656.reg_st_pre 		= 7832612;
-			//g_pz2656.offset 			= 0;
-		
-			pz_write_param(&PZ_SPI_EXT,		0x01);
 
+			uint16_t offset = 0;
+			REG_Set(0x22, &offset);
+		
 			pz_write_param(&PZ_FCL, 			0x00);
 			pz_write_param(&PZ_FCS, 			0x00);
 			pz_write_param(&PZ_MT_PDL, 		0x00);
@@ -1447,8 +1416,8 @@ void FSM_Tick_Callback()
 			pz_write_param(&PZ_SPI_ST_DL, 0x10);	
 		
 			// Precise Mechanical Alignment
-			pz_write_param(&PZ_AI_P_SEL, 	0x07);
-			pz_write_param(&PZ_AI_S_SEL, 	0x07);
+			pz_write_param(&PZ_AI_P_SEL, 	0x07); // Set <Dynamic Adjustment Phase Select> to ’7’ AI_P_SEL = 0x07.
+			pz_write_param(&PZ_AI_S_SEL, 	0x07); // Set <Dynamic Adjustment Scale Select> to ’7’ AI_S_SEL = 0x07
 		
 			pz_write_param(&PZ_AC_ETO, 		0x01);
 			pz_write_param(&PZ_AC_COUNT, 	0x06);
@@ -1485,25 +1454,23 @@ void FSM_Tick_Callback()
 
 		case FSM_CALIBRATION_PZ_PHASE_1_STEP_4:
 			{
+				// Koniec Precise Mechanical Alignment
 				motor_start(TORQUE_MODE, 0);
 			
 				g_pz2656.reg_ai_scale = pz_read_param(&PZ_AI_SCALES); // AI_SCALES
 				g_pz2656.reg_ai_phase = pz_read_param(&PZ_AI_PHASES); // AI_PHASES
-//				uint16_t reg_ai_scale  = pz_read_param(&PZ_AI_SCALES); // AI_SCALES
-//				uint16_t reg_ai_phase = pz_read_param(&PZ_AI_PHASES); // AI_PHASES
-				REG_Set(0x18, (uint16_t *) &g_pz2656.reg_ai_scale);
-				REG_Set(0x19, (uint16_t *) &g_pz2656.reg_ai_phase);
+				uint16_t reg_ai_scale = g_pz2656.reg_ai_scale;
+				uint16_t reg_ai_phase = g_pz2656.reg_ai_phase;
+				REG_Set(0x18, (uint16_t *) &reg_ai_scale);
+				REG_Set(0x19, (uint16_t *) &reg_ai_phase);
 
+				// disable dynamic adjustment by setting AI_S_SEL = 0x00 and AI_P_SEL = 0x00.
 				pz_write_param(&PZ_AI_P_SEL, 0x00);
 				pz_write_param(&PZ_AI_S_SEL, 0x00);
 
-//				pz_write_param(&PZ_AI_PHASE, reg_ai_phase);
-//				pz_write_param(&PZ_AI_SCALE, reg_ai_scale);
 				pz_write_param(&PZ_AI_SCALE, REG_Get_uint16(0x18));
 				pz_write_param(&PZ_AI_PHASE, REG_Get_uint16(0x19));
 
-	//			pz_write_command(0x41); // CONF_WRITE_ALL
-	//			g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
 				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_2_STEP_1);
 			}
 			break;
@@ -1511,14 +1478,14 @@ void FSM_Tick_Callback()
 		// ADJUSTMENT ANALOG
 		case FSM_CALIBRATION_PZ_PHASE_2_STEP_1:
 			// Filter Configuration before Analog Adjustment
-			pz_write_param(&PZ_IPO_FILT1, 0x6E);
-			pz_write_param(&PZ_IPO_FILT2, 0x04);
+			pz_write_param(&PZ_IPO_FILT1, 0x6E); // Set <Filter Parameter 1> to ’Before analog...’ IPO_FILT1 = 0x6E = 0d110
+			pz_write_param(&PZ_IPO_FILT2, 0x04); // Set <Filter Parameter 2> to ’Suitable for any...’ IPO_FILT2 = 0x04
 		
 			// Analog Autocalibration
-			pz_write_param(&PZ_AC_ETO, 		0x01);
-			pz_write_param(&PZ_AC_COUNT, 	0x06);
-			pz_write_param(&PZ_AC_SEL1, 	0x0F);
-			pz_write_param(&PZ_AC_SEL2, 	0x00);
+			pz_write_param(&PZ_AC_ETO, 		0x01); // Low speed operation
+			pz_write_param(&PZ_AC_COUNT, 	0x06); // Autocalibration count
+			pz_write_param(&PZ_AC_SEL1, 	0x0F); // Autocalibration select count
+			pz_write_param(&PZ_AC_SEL2, 	0x00); // Autocalibration select end
 
 			motor_start(TORQUE_MODE, 0);
 			FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_2_STEP_2);
@@ -1551,6 +1518,7 @@ void FSM_Tick_Callback()
 
 		case FSM_CALIBRATION_PZ_PHASE_2_STEP_4:
 			{
+				// Koniec Analog Adjustment
 				motor_start(TORQUE_MODE, 0);
 				//motor_stop();
 			
@@ -1564,17 +1532,17 @@ void FSM_Tick_Callback()
 				REG_Set(0x1C, &reg_sc_gain);
 				REG_Set(0x1D, &reg_sc_phase);
 
-				pz_write_param(&PZ_COS_OFF, reg_cos_off); // PZ_COS_OFF
-				pz_write_param(&PZ_SIN_OFF, reg_sin_off); // PZ_SIN_OFF
-				pz_write_param(&PZ_SC_GAIN, reg_sc_gain); // PZ_SC_GAIN
-				pz_write_param(&PZ_SC_PHASE, reg_sc_phase); // PZ_SC_PHASE
+//				pz_write_param(&PZ_COS_OFF, reg_cos_off); // PZ_COS_OFF
+//				pz_write_param(&PZ_SIN_OFF, reg_sin_off); // PZ_SIN_OFF
+//				pz_write_param(&PZ_SC_GAIN, reg_sc_gain); // PZ_SC_GAIN
+//				pz_write_param(&PZ_SC_PHASE, reg_sc_phase); // PZ_SC_PHASE
 
-				pz_write_param(&PZ_IPO_FILT1, 0xEA);
-				pz_write_param(&PZ_IPO_FILT2, 0x04);
+				pz_write_param(&PZ_IPO_FILT1, 0xEA); // Set <Filter Parameter 1> to ’After analog...’ IPO_FILT1 = 0xEA = 0d234
+				pz_write_param(&PZ_IPO_FILT2, 0x04); // Set <Filter Parameter 2> to ’Suitable for any...’ IPO_FILT2 = 0x04
 			
 				g_joint_configuration.absolute_encoder_enabled = true;
 			
-				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_1);
+				FSM_Activate_State(FSM_CALIBRATION_PZ_FINISH);
 			}
 			break;
 
@@ -1666,7 +1634,7 @@ void FSM_Tick_Callback()
 
 		case FSM_CALIBRATION_PZ_PHASE_4_STEP_3:
 			if (g_joint_status.b_safety_input == 0) {
-				g_encoder_position[1][fsm_calib_pz_p4_s1_counter - 1] = g_pz2656.angle;
+				g_encoder_position[1][fsm_calib_pz_p4_s1_counter - 1] = REG_Get_uint16(0xD8);
 				g_joint_configuration.safety_enabled = false;
 				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_1);
 			}
@@ -1718,7 +1686,7 @@ void FSM_Tick_Callback()
 
 		case FSM_CALIBRATION_PZ_PHASE_4_STEP_6:
 			if (g_joint_status.b_safety_input == 0) {
-				g_encoder_position[0][fsm_calib_pz_p4_s1_counter - 1] = g_pz2656.angle;
+				g_encoder_position[0][fsm_calib_pz_p4_s1_counter - 1] = REG_Get_uint16(0xD8);
 				g_joint_configuration.safety_enabled = false;
 				FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_4);
 			}
@@ -1751,7 +1719,9 @@ void FSM_Tick_Callback()
 //			HAL_TIM_Base_Start_IT(&htim7); // Enable 1 kHz timer
 //			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
 
-			FSM_Activate_State(FSM_INIT); // CALIBRATION FINISHED - GO TO INIT STATE
+			if (g_joint_status.stm_state_motor == IDLE) {
+				FSM_Activate_State(FSM_INIT); // CALIBRATION FINISHED - GO TO INIT STATE
+			}
 			break;
 
 		default:
@@ -1788,6 +1758,17 @@ bool FSM_Switch_State_Callback() // FIXME running transition should block changi
 			break;
 		}
 
+		case FSM_CALIBRATION_PZ_PHASE_4_STEP_1:
+		{
+
+			if (FSM_Get_State() == FSM_INIT)
+			{
+				return FSM_Activate_State(FSM_CALIBRATION_PZ_PHASE_4_STEP_1);
+			}
+
+			break;
+		}
+
 		case 171:
 		{
 
@@ -1816,9 +1797,11 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi)
 	switch (buf_rx[0]) {
 		case 0xA6: // read position
 			{
-					//g_pz2656.readings = ( (uint32_t) buf_rx[1] << 16 | (uint32_t) buf_rx[2] << 8 | (uint32_t) buf_rx[3]);
-				g_pz2656.readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
-				REG_Set(0xD8, (uint16_t *) &g_pz2656.readings);
+				uint16_t readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
+				REG_Set(0xD8, (uint16_t *) &readings);
+				g_pz2656.readings = REG_Get_uint16(0xD8);
+				//g_pz2656.readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
+				//REG_Set(0xD8, (uint16_t *) &g_pz2656.readings);
 
 				if (REG_Get_uint8(0x21)) {
 					g_pz2656.angle 			= UINT16_MAX - (uint16_t) ((int32_t) REG_Get_uint16(0xD8) - (int32_t) REG_Get_uint16(0x22));
@@ -2081,7 +2064,7 @@ uint16_t REG_Get_uint16(uint8_t rejestr)
 {
 	uint16_t * p_g_registers = (uint16_t *) &g_registers;
 
-	uint16_t value = (*(p_g_registers + rejestr)) & 0xFF;
+	uint16_t value = (*(p_g_registers + rejestr)) & 0xFFFF;
 
 	return value;
 }
