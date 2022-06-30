@@ -99,8 +99,8 @@ Counters_Handle_t volatile g_counters = {
 	.main_loop = 0,
 	.timer6 = 0,
 	.timer7 = 0,
-	.spi_rx_counter = 0,
-	.spi_tx_counter = 0,
+//	.spi_rx_counter = 0,
+//	.spi_tx_counter = 0,
 	.spi_txrx_counter = 0,
 };
 
@@ -1800,21 +1800,15 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi)
 				uint16_t readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
 				REG_Set(0xD8, (uint16_t *) &readings);
 				g_pz2656.readings = REG_Get_uint16(0xD8);
-				//g_pz2656.readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
-				//REG_Set(0xD8, (uint16_t *) &g_pz2656.readings);
 
 				if (REG_Get_uint8(0x21)) {
 					g_pz2656.angle 			= UINT16_MAX - (uint16_t) ((int32_t) REG_Get_uint16(0xD8) - (int32_t) REG_Get_uint16(0x22));
-		//			g_pz2656.angle 			= UINT16_MAX - (uint16_t) ((int32_t) g_pz2656.readings - (int32_t) g_pz2656.offset);
 				} 
 				else
 				{
 					g_pz2656.angle 			= (uint16_t) ((int32_t) REG_Get_uint16(0xD8) - (int32_t) REG_Get_uint16(0x22));
-		//			g_pz2656.angle 			= (uint16_t) ((int32_t) g_pz2656.readings - (int32_t) g_pz2656.offset);
 				}
-					
-		//		g_joint_status.f_current_joint_position_from_absolute_encoder =  fmod((double) ((double) g_pz2656.angle / UINT16_MAX) * M_TWOPI + M_PI, (double) M_TWOPI) - M_PI ;
-			
+								
 				if (g_pz2656.started == true)
 				{
 					bufsize = 6;
@@ -2095,7 +2089,9 @@ void REG_Read(uint8_t poczatek, uint8_t koniec, uint8_t * data)
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs) 
 {
 
-	if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
+//	if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
+//	{
+	do
 	{
 		// RETRIEVE CAN MESSAGE -------------------------------------------------------------------------
 		HAL_FDCAN_GetRxMessage(hfdcan1, FDCAN_RX_FIFO0, &can_rx_header, can_rx_data);
@@ -2181,7 +2177,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 
 					// -------------------------------------------------------------------------------------------------
 					// Recalculate data from floats to CAN
-					int32_t l_joint_position_in_s32degree = (int32_t) (g_joint_status.f_current_joint_position * ( (float) UINT32_MAX / M_TWOPI));
+					int32_t l_joint_position_in_s32degree = (int32_t) (g_joint_status.f_current_joint_position_from_absolute_encoder * ( (float) UINT32_MAX / M_TWOPI));
 
 	//				int16_t l_speed_in_dpp = g_joint_status.f_current_joint_speed * (float) INT16_MAX / M_TWOPI;
 					int16_t l_speed_in_dpp = g_joint_status.f_current_joint_speed * (float) INT16_MAX / MAX_SPEED_THROUGH_CAN;
@@ -2209,8 +2205,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					can_tx_data[13] = g_joint_status.warnings;
 
 					// -- MA730
-					can_tx_data[14] = g_ma730.angle >> 8;
-					can_tx_data[15] = g_ma730.angle;
+//					can_tx_data[14] = g_ma730.angle >> 8;
+//					can_tx_data[15] = g_ma730.angle;
 					can_tx_data[16] = (uint8_t) g_joint_status.current_motor_temperature;
 	//				can_tx_data[17] = g_current_sector_number;
 	//				can_tx_data[18] = g_current_electrical_rotation >> 8;
@@ -2420,15 +2416,23 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 			g_counters.can_tx_counter++;
 		}
 
+
 		// clear global rx and tx buffer
 		for (int i = 0; i < 24; i++)
 		{
 			can_rx_data[i]	= 0;
 			can_tx_data[i]	= 0;
 		}
-	}
+	} 
+	while (HAL_FDCAN_GetRxFifoFillLevel(hfdcan1, FDCAN_RX_FIFO0) > 0);
+//	}
+	
 }
 
+//void HAL_FDCAN_TxEventFifoCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t TxEventFifoITs)
+//{
+//	g_counters.can_tx_counter++;
+//}
 // PZ
 //#pragma GCC push_options
 //#pragma GCC optimize ("O0")

@@ -135,8 +135,10 @@ typedef struct Counters_Handle {
 	uint32_t timer7;
 	uint32_t can_rx_counter;
 	uint32_t can_tx_counter;
-	uint32_t spi_rx_counter;
-	uint32_t spi_tx_counter;
+	uint32_t can_rx_fill_level;
+	uint32_t can_tx_free_level;
+//	uint32_t spi_rx_counter;
+//	uint32_t spi_tx_counter;
 	uint32_t spi_txrx_counter;
 } __attribute__ ((packed)) Counters_Handle_t;
 

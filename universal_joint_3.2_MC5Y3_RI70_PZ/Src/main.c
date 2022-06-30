@@ -167,7 +167,9 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	g_counters.main_loop++;
+		g_counters.main_loop++;
+		g_counters.can_tx_free_level = HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1);
+		g_counters.can_rx_fill_level = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0);
 
   }
   /* USER CODE END 3 */

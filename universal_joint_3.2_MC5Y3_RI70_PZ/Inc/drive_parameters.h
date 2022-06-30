@@ -71,7 +71,7 @@
                                                            number of PWM cycles */
 /* Gains values for torque and flux control loops */
 #define PID_TORQUE_KP_DEFAULT         2425
-#define PID_TORQUE_KI_DEFAULT         350
+#define PID_TORQUE_KI_DEFAULT         4000
 #define PID_TORQUE_KD_DEFAULT         100
 #define PID_FLUX_KP_DEFAULT           2425
 #define PID_FLUX_KI_DEFAULT           350
@@ -144,7 +144,7 @@
 
 /******************************   START-UP PARAMETERS   **********************/
 /* Encoder alignment */
-#define ALIGNMENT_DURATION              2000 /*!< milliseconds */
+#define ALIGNMENT_DURATION              4000 /*!< milliseconds */
 #define ALIGNMENT_ANGLE_DEG             90 /*!< degrees [0...359] */
 #define FINAL_I_ALIGNMENT               5822 /*!< s16A */
 // With ALIGNMENT_ANGLE_DEG equal to 90 degrees final alignment
