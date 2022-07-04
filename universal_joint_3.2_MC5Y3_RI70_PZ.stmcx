@@ -430,11 +430,11 @@
 						<var version="1.0" type="MC_Bool" name="Flux - Enable differential term" enable="false" visible="true" readonly="false" value="false" />
 						<var version="1.0" type="MC_Int" name="Flux - D dividend" enable="false" visible="true" readonly="false" value="100" />
 						<var version="1.0" type="MC_Int" name="Flux - D divisor" enable="true" visible="true" readonly="true" value="8192" />
-						<var version="1.0" type="MC_Bool" name="SpeedCtrl_Manual_editing" enable="true" visible="true" readonly="false" value="false" />
+						<var version="1.0" type="MC_Bool" name="SpeedCtrl_Manual_editing" enable="true" visible="true" readonly="false" value="true" />
 						<var version="1.0" type="MC_Double" name="SpeedCtrl - Execution rate" enable="true" visible="true" readonly="false" value="1" />
-						<var version="1.0" type="MC_Int" name="SpeedCtrl - P dividend" enable="true" visible="true" readonly="false" value="2342" />
+						<var version="1.0" type="MC_Int" name="SpeedCtrl - P dividend" enable="true" visible="true" readonly="false" value="4000" />
 						<var version="1.0" type="MC_Int" name="SpeedCtrl - P divisor" enable="true" visible="true" readonly="false" value="128" />
-						<var version="1.0" type="MC_Int" name="SpeedCtrl - I dividend" enable="true" visible="true" readonly="false" value="1110" />
+						<var version="1.0" type="MC_Int" name="SpeedCtrl - I dividend" enable="true" visible="true" readonly="false" value="1600" />
 						<var version="1.0" type="MC_Int" name="SpeedCtrl - I divisor" enable="true" visible="true" readonly="false" value="16384" />
 						<var version="1.0" type="MC_Bool" name="SpeedCtrl - Enable differential term" enable="false" visible="true" readonly="false" value="false" />
 						<var version="1.0" type="MC_Int" name="SpeedCtrl - D dividend" enable="false" visible="true" readonly="false" value="0" />
