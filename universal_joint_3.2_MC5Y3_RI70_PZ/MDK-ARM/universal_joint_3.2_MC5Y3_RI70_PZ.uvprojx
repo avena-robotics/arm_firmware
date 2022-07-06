@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>ARM_MATH_CM4,USE_HAL_DRIVER,STM32G431xx,ENCODER_PZ2656</Define>
               <Undefine></Undefine>
-              <IncludePath>../Inc;     ../Drivers/STM32G4xx_HAL_Driver/Inc;     ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;     ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/G4xx/Inc;     ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/Any/Inc;     ../Drivers/CMSIS/Device/ST/STM32G4xx/Include;     ../Drivers/CMSIS/Include;     ../Drivers/CMSIS/DSP/Include;      ../../commons/</IncludePath>
+              <IncludePath>../Inc;        ../Drivers/STM32G4xx_HAL_Driver/Inc;        ../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;        ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/G4xx/Inc;        ../MCSDK_v5.Y.3/MotorControl/MCSDK/MCLib/Any/Inc;        ../Drivers/CMSIS/Device/ST/STM32G4xx/Include;        ../Drivers/CMSIS/Include;        ../Drivers/CMSIS/DSP/Include;         ../../commons/</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
