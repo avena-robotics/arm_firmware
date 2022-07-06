@@ -67,11 +67,11 @@ volatile uint8_t buf_tx[0x0F + 3] = {0};
 volatile uint8_t buf_rx[0x0F + 3] = {0};
 volatile uint16_t bufsize = 0;
 
-uint32_t g_pz2656_id = 0;
-uint8_t data1[4] = {0};
-uint8_t data2[4] = {0};
-uint8_t data3[4] = {0};
-uint8_t data4[4] = {0};
+//uint32_t g_pz2656_id = 0;
+//uint8_t data1[4] = {0};
+//uint8_t data2[4] = {0};
+//uint8_t data3[4] = {0};
+//uint8_t data4[4] = {0};
 
 volatile int16_t g_temp_current_position_before = 0;
 volatile int16_t g_temp_current_position_after = 0;
@@ -199,7 +199,6 @@ void UJ_Init()
 {
 	// NTC
 	NTC_Init(&g_TempBearingSensorParamsM1);
-
 #ifdef ENCODER_MA730
 	MA730_WriteRegister(0, 0b00000000);
 	MA730_WriteRegister(1, 0b00000000);
@@ -219,11 +218,14 @@ void UJ_Init()
 	MA730_ReadRegister(6);
 	MA730_ReadRegister(9);
 #endif
-	
-	
 
 #if PCB_VERSION >= 0x030000
 	FLASH_Configuration_Load(); // Read configuration from FLASH
+#endif
+
+#if PCB_VERSION >= 0x030400
+	HAL_GPIO_WritePin(BC_ENABLE_GPIO_Port, BC_ENABLE_Pin, GPIO_PIN_SET);
+	//HAL_Delay(100);
 #endif
 
 #if PCB_VERSION >= 0x030300
@@ -264,6 +266,7 @@ if (REG_Get_uint16(0x40) == 0xFFFF)
 }
 	
 #ifdef ENCODER_PZ2656
+	HAL_Delay(100);
 	// Konfiguracja stala
 	pz_write_param(&PZ_FCL, 			0x00);
 	pz_write_param(&PZ_FCS, 			0x00);
@@ -272,16 +275,25 @@ if (REG_Get_uint16(0x40) == 0xFFFF)
 	pz_write_param(&PZ_ST_PDL, 		0x10);
 	pz_write_param(&PZ_SPI_MT_DL, 0x00);
 	pz_write_param(&PZ_SPI_ST_DL, 0x10);	
+//	pz_write_param(&PZ_IPO_FILT1, 0xEA);	
+//	pz_write_param(&PZ_IPO_FILT2, 0x04);	
 
-	// Data readed from FLASH
-	// DIGITAL ALIGNMENT
-	pz_write_param(&PZ_AI_SCALE, REG_Get_uint16(0x18));
-	pz_write_param(&PZ_AI_PHASE, REG_Get_uint16(0x19));
-	// ANALOG ALIGNMENT
-	pz_write_param(&PZ_COS_OFF,  REG_Get_uint16(0x1A));
-	pz_write_param(&PZ_SIN_OFF,  REG_Get_uint16(0x1B));
-	pz_write_param(&PZ_SC_GAIN,  REG_Get_uint16(0x1C));
-	pz_write_param(&PZ_SC_PHASE, REG_Get_uint16(0x1D));
+//	// Data readed from FLASH
+//	// DIGITAL ALIGNMENT
+//	pz_write_param(&PZ_AI_SCALE, REG_Get_uint16(0x18));
+//	pz_write_param(&PZ_AI_PHASE, REG_Get_uint16(0x19));
+//	// ANALOG ALIGNMENT
+//	pz_write_param(&PZ_COS_OFF,  REG_Get_uint16(0x1A));
+//	pz_write_param(&PZ_SIN_OFF,  REG_Get_uint16(0x1B));
+//	pz_write_param(&PZ_SC_GAIN,  REG_Get_uint16(0x1C));
+//	pz_write_param(&PZ_SC_PHASE, REG_Get_uint16(0x1D));
+
+	pz_write_command(PZ_COMMAND_CONF_READ_ALL);
+	g_pz2656.diag	= pz_read_param(&PZ_CMD_STAT);
+	if (g_pz2656.diag != 0x00)
+	{
+		
+	}
 
 	g_pz2656.reg_ai_phase 	= pz_read_param(&PZ_AI_PHASE);
 	g_pz2656.reg_ai_scale 	= pz_read_param(&PZ_AI_SCALE);
@@ -1442,7 +1454,7 @@ void FSM_Tick_Callback()
 		case FSM_CALIBRATION_PZ_PHASE_1_STEP_3:
 			motor_start(SPEED_MODE, 330);
 		
-			pz_write_command(0xB1); // AUTO_ADJ_DIG
+			pz_write_command(PZ_COMMAND_AUTO_ADJ_DIG); // AUTO_ADJ_DIG
 			g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
 		
 			static uint16_t fsm_calib_pz_p1_s3_counter;
@@ -1506,7 +1518,7 @@ void FSM_Tick_Callback()
 		case FSM_CALIBRATION_PZ_PHASE_2_STEP_3:
 			motor_start(SPEED_MODE, 330);
 		
-			pz_write_command(0xB0); // AUTO_ADJ_DIG
+			pz_write_command(PZ_COMMAND_AUTO_ADJ_DIG); // AUTO_ADJ_DIG
 			g_pz2656.diag = pz_read_param(&PZ_CMD_STAT); // CMD_STAT
 		
 			static uint16_t fsm_calib_pz_p2_s3_counter;
@@ -1695,6 +1707,7 @@ void FSM_Tick_Callback()
 #endif
 
 		case FSM_CALIBRATION_PZ_FINISH:
+			g_joint_configuration.absolute_encoder_enabled = false;
 			motor_stop();
 		
 			// ustawienie rejestrow
@@ -1720,7 +1733,20 @@ void FSM_Tick_Callback()
 //			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
 
 			if (g_joint_status.stm_state_motor == IDLE) {
-				FSM_Activate_State(FSM_INIT); // CALIBRATION FINISHED - GO TO INIT STATE
+				// Zapis do eeprom
+				pz_write_command(PZ_COMMAND_CONF_WRITE_ALL);
+				FSM_Activate_State(FSM_CALIBRATION_PZ_STORE_CONFIGURATION); // CALIBRATION FINISHED - GO TO INIT STATE
+			}
+			break;
+
+		case FSM_CALIBRATION_PZ_STORE_CONFIGURATION:
+			{
+				// Sprawdzenie statusu zapisu EEPROM
+				uint16_t cmd_stat	= pz_read_param(&PZ_CMD_STAT);
+				if (cmd_stat == 0x00)
+				{
+					FSM_Activate_State(FSM_INIT); // CALIBRATION FINISHED - GO TO INIT STATE
+				}
 			}
 			break;
 
@@ -1769,16 +1795,15 @@ bool FSM_Switch_State_Callback() // FIXME running transition should block changi
 			break;
 		}
 
-		case 171:
-		{
+//		case FSM_INIT:
+//		{
+//			if (FSM_Get_State() == FSM_CALIBRATION_PZ_STORE_CONFIGURATION)
+//			{
+//				return FSM_Activate_State(FSM_INIT);
+//			}
 
-			if (FSM_Get_State() == FSM_INIT)
-			{
-				return FSM_Activate_State(171);
-			}
-
-			break;
-		}
+//			break;
+//		}
 		
 		default:
 		{
@@ -1790,86 +1815,80 @@ bool FSM_Switch_State_Callback() // FIXME running transition should block changi
 }
 
 // HAL Callbacks
-void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi)
-{
-	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
+//void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef * hspi)
+//{
+//	//ABSOLUTE_ENCODER_CS_GPIO_Port->BRR = (uint32_t) ABSOLUTE_ENCODER_CS_Pin;
+//	HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
 
-	switch (buf_rx[0]) {
-		case 0xA6: // read position
-			{
-				uint16_t readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
-				REG_Set(0xD8, (uint16_t *) &readings);
-				g_pz2656.readings = REG_Get_uint16(0xD8);
+//	switch (buf_rx[0]) {
+//		case 0xA6: // read position
+//			{
+//				uint16_t readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
+//				REG_Set(0xD8, (uint16_t *) &readings);
+//				g_pz2656.readings = REG_Get_uint16(0xD8);
+//								
+//				if (g_pz2656.started == true)
+//				{
+//					bufsize = 6;
+//					buf_tx[0] = 0xA6;
 
-				if (REG_Get_uint8(0x21)) {
-					g_pz2656.angle 			= UINT16_MAX - (uint16_t) ((int32_t) REG_Get_uint16(0xD8) - (int32_t) REG_Get_uint16(0x22));
-				} 
-				else
-				{
-					g_pz2656.angle 			= (uint16_t) ((int32_t) REG_Get_uint16(0xD8) - (int32_t) REG_Get_uint16(0x22));
-				}
-								
-				if (g_pz2656.started == true)
-				{
-					bufsize = 6;
-					buf_tx[0] = 0xA6;
+////					for (uint16_t i = 1; i < bufsize; i++) {
+////						buf_tx[i] = 0x00;
+////					}
 
-					for (uint16_t i = 1; i < bufsize; i++) {
-						buf_tx[i] = 0x00;
-					}
+//					//ABSOLUTE_ENCODER_CS_GPIO_Port->BSRR = (uint32_t) ABSOLUTE_ENCODER_CS_Pin;
+//					HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+//					HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+//				}
 
-					HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
-					HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
-				}
-
-		//			// next command - send diagnostic
-		//			bufsize = 2;
-		//			buf_tx[0] = 0x68;
-		//			buf_tx[1] = 0x00;
-		//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
-		//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
-			}
-			
-			break;
-
-//		case 0x68: // diag
-//			g_pz2656.diag = buf_rx[1];
-//			// next command - send diagnostic
-//			bufsize = 2;
-//			buf_tx[0] = 0x69;
-//			buf_tx[1] = 0x00;
-//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
-//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+//		//			// next command - send diagnostic
+//		//			bufsize = 2;
+//		//			buf_tx[0] = 0x68;
+//		//			buf_tx[1] = 0x00;
+//		//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+//		//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+//			}
+//			
 //			break;
 
-//		case 0x69: // diag
-//			g_pz2656.diag = buf_rx[1] << 8;
-//			// next command - send diagnostic
-//			bufsize = 2;
-//			buf_tx[0] = 0x6A;
-//			buf_tx[1] = 0x00;
-//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
-//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
-//			break;
+////		case 0x68: // diag
+////			g_pz2656.diag = buf_rx[1];
+////			// next command - send diagnostic
+////			bufsize = 2;
+////			buf_tx[0] = 0x69;
+////			buf_tx[1] = 0x00;
+////			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+////			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+////			break;
 
-//		case 0x6A: // diag
-//			g_pz2656.diag = buf_rx[1] << 16;
-//			// next command - send diagnostic
-//			bufsize = 2;
-//			buf_tx[0] = 0x6B;
-//			buf_tx[1] = 0x00;
-//			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
-//			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
-//			break;
+////		case 0x69: // diag
+////			g_pz2656.diag = buf_rx[1] << 8;
+////			// next command - send diagnostic
+////			bufsize = 2;
+////			buf_tx[0] = 0x6A;
+////			buf_tx[1] = 0x00;
+////			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+////			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+////			break;
 
-//		case 0x6B: // diag
-//			g_pz2656.diag = buf_rx[1] << 24;
-//			break;
-	}
+////		case 0x6A: // diag
+////			g_pz2656.diag = buf_rx[1] << 16;
+////			// next command - send diagnostic
+////			bufsize = 2;
+////			buf_tx[0] = 0x6B;
+////			buf_tx[1] = 0x00;
+////			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+////			HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+////			break;
 
-	g_counters.spi_txrx_counter++;
+////		case 0x6B: // diag
+////			g_pz2656.diag = buf_rx[1] << 24;
+////			break;
+//	}
 
-}
+//	g_counters.spi_txrx_counter++;
+
+//}
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) 
 {
@@ -1901,8 +1920,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 #ifdef ENCODER_PZ2656
 		if (g_joint_configuration.absolute_encoder_enabled == true)
 		{
-			if (!g_pz2656.started) {
-				g_pz2656.started = true;
+//			if (!g_pz2656.started) {
+//				g_pz2656.started = true;
 				bufsize = 6;
 				buf_tx[0] = 0xA6;
 
@@ -1911,16 +1930,35 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				}
 
 				HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
-				HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+				//HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+				HAL_SPI_TransmitReceive(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize, 1);
+				HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
+				
+				uint16_t readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
+				REG_Set(0xD8, (uint16_t *) &readings);
+				g_pz2656.readings = REG_Get_uint16(0xD8);
+				//g_pz2656.readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
+
+			//}
+
+			if (REG_Get_uint8(0x21)) {
+				//g_pz2656.angle 			= UINT16_MAX - (uint16_t) ((int32_t) REG_Get_uint16(0xD8) - (int32_t) REG_Get_uint16(0x22));
+				g_pz2656.angle 			= UINT16_MAX - (uint16_t) ((int32_t) g_pz2656.readings - (int32_t) REG_Get_uint16(0x22));
+			} 
+			else
+			{
+				//g_pz2656.angle 			= (uint16_t) ((int32_t) REG_Get_uint16(0xD8) - (int32_t) REG_Get_uint16(0x22));
+				g_pz2656.angle 			= (uint16_t) ((int32_t) g_pz2656.readings - (int32_t) REG_Get_uint16(0x22));
 			}
 			
 			g_joint_status.f_current_joint_position_from_absolute_encoder =  fmod((double) ((double) g_pz2656.angle / UINT16_MAX) * M_TWOPI + M_PI, (double) M_TWOPI) - M_PI ;
+		}
 
-		}
-		else
-		{
-			g_pz2656.started = false;
-		}
+//		}
+//		else
+//		{
+//			g_pz2656.started = false;
+//		}
 #endif
 
 
@@ -2089,10 +2127,13 @@ void REG_Read(uint8_t poczatek, uint8_t koniec, uint8_t * data)
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs) 
 {
 
-//	if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
-//	{
-	do
+	if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
+//	do
 	{
+		uint32_t fill_level = HAL_FDCAN_GetRxFifoFillLevel(hfdcan1, FDCAN_RX_FIFO0);
+		for (int i = 0; i < fill_level; i++)
+		{
+		
 		// RETRIEVE CAN MESSAGE -------------------------------------------------------------------------
 		HAL_FDCAN_GetRxMessage(hfdcan1, FDCAN_RX_FIFO0, &can_rx_header, can_rx_data);
 		g_counters.can_rx_counter++;
@@ -2423,8 +2464,9 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 			can_rx_data[i]	= 0;
 			can_tx_data[i]	= 0;
 		}
+		}
 	} 
-	while (HAL_FDCAN_GetRxFifoFillLevel(hfdcan1, FDCAN_RX_FIFO0) > 0);
+//	while (HAL_FDCAN_GetRxFifoFillLevel(hfdcan1, FDCAN_RX_FIFO0) > 0);
 //	}
 	
 }

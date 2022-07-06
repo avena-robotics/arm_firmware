@@ -304,7 +304,7 @@ typedef struct Joint_Status_Handle {
 #define FSM_CALIBRATION_PZ_PHASE_4_STEP_6 													166
 
 #define FSM_CALIBRATION_PZ_FINISH 																	171
-
+#define FSM_CALIBRATION_PZ_STORE_CONFIGURATION											172
 //} FSM_State_t;
 
 // FUNCTION DEFINITION
