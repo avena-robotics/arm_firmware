@@ -29,14 +29,14 @@
 *.elf
 *.hex
 *.h86
-*.lib
+# *.lib
 *.obj
 *.o
 *.sbr
 
 # Build files
 # define exception below if needed
-*.bat
+# *.bat
 *._ia
 *.__i
 *._ii

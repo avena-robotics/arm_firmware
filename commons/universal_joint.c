@@ -11,7 +11,7 @@
 // 5.Y.3 // 0x055a0300
 // 5.Y.4 // 0x055a0400
 
-union register_data_t {
+union register_data_flash_t {
 	 uint16_t data[4];
 	 uint64_t flash;
 };
@@ -20,7 +20,7 @@ union register_data_t {
 //union register_data_t g_ro_non_volatile[16] = {0};
 //union register_data_t g_rw_volatile[16] = {0};
 //union register_data_t g_ro_volatile[16] = {0};
-union register_data_t g_registers[64] = {0}; // 256 baitow
+union register_data_flash_t g_registers_flash[64] = {0}; // 256 baitow
 
 //uint16_t g_ro_non_volatile[64] 	= {0};
 //uint16_t g_rw_non_volatile[64] 	= {0};
@@ -229,7 +229,7 @@ void UJ_Init()
 #endif
 
 #if PCB_VERSION >= 0x030300
-	if (g_registers[0].data[0] == 0xFFFF) // pusta konfiguracja
+	if (g_registers_flash[0].data[0] == 0xFFFF) // pusta konfiguracja
 	{
 		uint16_t sdk_version_1 = (0x5) << 8 | (0x5a);
 		uint16_t sdk_version_2 = (0x3) << 8 | (0x0);
@@ -875,7 +875,7 @@ void FLASH_Configuration_Load()
 #endif
 
 #ifdef ENCODER_PZ2656
-	Flash_Read_Data(g_flash_address_configuration, (uint32_t *) g_registers, 64 * 2);
+	Flash_Read_Data(g_flash_address_configuration, (uint32_t *) g_registers_flash, 64 * 2);
 #endif
 
 	g_joint_configuration.joint_working_area 								= M_PI * (180.0 - 7.655 - 1.0) / 180.0;
@@ -1008,7 +1008,7 @@ uint32_t FLASH_Configuration_Save()
 	// RW
 	for( int i = 0; i < 32; i++) 
 	{
-		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, g_flash_address_configuration + i * 8, g_registers[i].flash) != HAL_OK)
+		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, g_flash_address_configuration + i * 8, g_registers_flash[i].flash) != HAL_OK)
 		{
 			error = HAL_FLASH_GetError ();
 		}
@@ -2064,28 +2064,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void REG_Set(uint8_t rejestr, uint16_t * data) 
 {
-	uint16_t * p_g_registers = (uint16_t *) &g_registers;
+	uint16_t * p_g_registers = (uint16_t *) &g_registers_flash;
 
 	*(p_g_registers + rejestr) = data[0];
 }
 
 void REG_Get(uint8_t rejestr, uint16_t * data) 
 {
-	uint16_t * p_g_registers = (uint16_t *) &g_registers;
+	uint16_t * p_g_registers = (uint16_t *) &g_registers_flash;
 
 	data[0] = *(p_g_registers + rejestr);
 }
 
 uint16_t * REG_Get_pointer(uint8_t rejestr)
 {
-	uint16_t * p_g_registers = (uint16_t *) &g_registers;
+	uint16_t * p_g_registers = (uint16_t *) &g_registers_flash;
 	
 	return p_g_registers + rejestr;
 }
 
 uint8_t REG_Get_uint8(uint8_t rejestr) 
 {
-	uint16_t * p_g_registers = (uint16_t *) &g_registers;
+	uint16_t * p_g_registers = (uint16_t *) &g_registers_flash;
 
 	uint8_t value = (*(p_g_registers + rejestr)) & 0xFF;
 
@@ -2094,7 +2094,7 @@ uint8_t REG_Get_uint8(uint8_t rejestr)
 
 uint16_t REG_Get_uint16(uint8_t rejestr) 
 {
-	uint16_t * p_g_registers = (uint16_t *) &g_registers;
+	uint16_t * p_g_registers = (uint16_t *) &g_registers_flash;
 
 	uint16_t value = (*(p_g_registers + rejestr)) & 0xFFFF;
 
@@ -2103,7 +2103,7 @@ uint16_t REG_Get_uint16(uint8_t rejestr)
 
 void REG_Write(uint8_t poczatek, uint8_t koniec, uint8_t * data) 
 {
-	uint8_t * p_g_registers = (uint8_t *) &g_registers;
+	uint8_t * p_g_registers = (uint8_t *) &g_registers_flash;
 	// ustalenie poczatku pamieci
 //	memcpy ( &g_registers + poczatek, data, sizeof(uint16_t) * (koniec - poczatek) );
 	for (int i = 0; i < (koniec - poczatek) / 2; i++)
@@ -2115,7 +2115,7 @@ void REG_Write(uint8_t poczatek, uint8_t koniec, uint8_t * data)
 
 void REG_Read(uint8_t poczatek, uint8_t koniec, uint8_t * data) 
 {
-	uint8_t * p_g_registers = (uint8_t *) &g_registers;
+	uint8_t * p_g_registers = (uint8_t *) &g_registers_flash;
 
 	for (int i = 0; i < koniec - poczatek; i++)
 	{
@@ -2400,6 +2400,82 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 				}
 				break;
 
+			case 0xC: // Odczyt rejestrow - EEPROM
+				{
+					dlugosc_danych_polecenia = 2;
+					// int8_t - rejestr poczatkowy
+					// int8_t - dlugosc <= 64
+					offset = dlugosc_danych_polecenia * numer_w_szeregu + 2;
+					uint8_t poczatek = can_rx_data[0]; // rejestr poczatkowy
+					uint8_t dlugosc  = can_rx_data[1] * 2; // ilosc rejestrow (16bit)
+					uint8_t koniec   = poczatek + dlugosc;
+					
+					// dlugosc danych can - 0,1,2,3,4,5,6,7,8,12,16,20,24,32,48,64
+					REG_Read(poczatek, koniec, (uint8_t *) &can_tx_data);
+					if (dlugosc > 48) 
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_64;
+					}
+					else if (dlugosc > 32) 
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_48;
+					}
+					else if (dlugosc > 24) 
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_32;
+					}
+					else if (dlugosc > 20) 
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_24;
+					}
+					else if (dlugosc > 16) 
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_20;
+					}
+					else if (dlugosc > 12) 
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_16;
+					}
+					else if (dlugosc > 8) 
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_12;
+					}
+					else
+					{
+						can_tx_header.DataLength = FDCAN_DLC_BYTES_8;
+					}
+				}
+				break;
+
+			case 0xD: // Zapis rejestrow - EEPROM - 13 BANKOW, 64 bajty kazdy
+				{
+					//dlugosc_danych_polecenia = 2;
+					// int8_t - rejestr poczatkowy (zapis mozliwy tylko 0-63, 80-191)
+					// int8_t - dlugosc
+					uint8_t poczatek = can_rx_data[0]; // rejestr poczatkowy
+					uint8_t dlugosc  = can_rx_data[1] * 2; // ilosc rejestrow (16bit)
+					uint8_t koniec   = poczatek + dlugosc;
+					
+					offset = dlugosc * numer_w_szeregu + 2;
+					// offset + dlugosc nie moze przekroczyc 64 baitow
+					
+					// sprawdzenie zakresu
+//					if ((( (poczatek - 0) | (0 - poczatek) | (koniec - 63) | (63 - koniec) ) >= 0) || (( (poczatek - 80) | (80 - poczatek) | (koniec - 191) | (191 - koniec) ) >= 0) && (offset + dlugosc < 64) )
+//					{
+						uint8_t * p_data;
+						p_data = (uint8_t *) malloc (dlugosc * 2 * sizeof(uint8_t));
+						memcpy(p_data, (uint8_t * ) &(can_rx_data[offset]), dlugosc * 2 * sizeof(uint8_t));
+						// poprawny zakres
+						REG_Write(poczatek, koniec, p_data);
+						free( p_data );
+//					}
+//					else
+//					{
+//							// blad zakresu
+//					}
+				}
+				break;
+				
 #ifdef ENCODER_MA730
 
 			case 0xC: // GET MA730 SECTOR VALUE
