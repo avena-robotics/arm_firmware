@@ -29,11 +29,12 @@
 
   <project>
     <PathAndName>.\universal_joint_3.2_MC5Y3_RI70_PZ\MDK-ARM\universal_joint_3.2_MC5Y3_RI70_PZ.uvprojx</PathAndName>
+    <NodeIsActive>1</NodeIsActive>
   </project>
 
   <project>
     <PathAndName>.\universal_joint_3.2_MC5Y3_RI80_PZ\MDK-ARM\universal_joint_3.2_MC5Y3_RI80_PZ.uvprojx</PathAndName>
-    <NodeIsActive>1</NodeIsActive>
+    <NodeIsExpanded>1</NodeIsExpanded>
   </project>
 
   <project>

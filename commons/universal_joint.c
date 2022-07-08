@@ -723,14 +723,14 @@ void CheckErrorsAndWarnings()
 	}
 
 	// ENCODER_NOT_ACCURATE
-	if (g_joint_status.encoder_position_state != POSITION_ACCURATE)
-	{
-		g_joint_status.warnings = g_joint_status.warnings | JOINT_POSITION_NOT_ACCURATE;
-	}
-	else
-	{
-		g_joint_status.warnings = g_joint_status.warnings & (0xFF ^ JOINT_POSITION_NOT_ACCURATE);
-	}
+//	if (g_joint_status.encoder_position_state != POSITION_ACCURATE)
+//	{
+//		g_joint_status.warnings = g_joint_status.warnings | JOINT_POSITION_NOT_ACCURATE;
+//	}
+//	else
+//	{
+//		g_joint_status.warnings = g_joint_status.warnings & (0xFF ^ JOINT_POSITION_NOT_ACCURATE);
+//	}
 
 	// SAFETY
 	if (g_joint_status.b_safety_input == 0)
@@ -835,44 +835,44 @@ bool FLASH_Configuration_Check()
 void FLASH_Configuration_Load() 
 {
 
-#ifdef ENCODER_MA730
-	Flash_Read_Data(g_flash_address_configuration, (uint32_t *) g_calibration_config, 10);
+//#ifdef ENCODER_MA730
+//	Flash_Read_Data(g_flash_address_configuration, (uint32_t *) g_calibration_config, 10);
 
-	g_joint_configuration.calibration_table_size 						= g_calibration_config[8]; // FIXME !!!!
+//	g_joint_configuration.calibration_table_size 						= g_calibration_config[8]; // FIXME !!!!
 
-	if (g_joint_configuration.calibration_table_size > 0 && g_joint_configuration.calibration_table_size < 65535) {
-		// Read joint configuration from FLASH
-		g_joint_configuration.pole_pairs 											= g_calibration_config[0];
-		g_joint_configuration.gear_ratio 											= g_calibration_config[1];
-		g_joint_configuration.calibration_sector_size 				= g_calibration_config[4];
-		g_joint_configuration.reachable_electrical_rotations	= g_calibration_config[5];
-		g_joint_configuration.number_of_sectors 							= g_calibration_config[8];
-		// 9
-		g_joint_configuration.zero_electric_position 					= (int16_t) g_calibration_config[12];
-		g_joint_configuration.zero_electric_rotation 					= g_calibration_config[13];
+//	if (g_joint_configuration.calibration_table_size > 0 && g_joint_configuration.calibration_table_size < 65535) {
+//		// Read joint configuration from FLASH
+//		g_joint_configuration.pole_pairs 											= g_calibration_config[0];
+//		g_joint_configuration.gear_ratio 											= g_calibration_config[1];
+//		g_joint_configuration.calibration_sector_size 				= g_calibration_config[4];
+//		g_joint_configuration.reachable_electrical_rotations	= g_calibration_config[5];
+//		g_joint_configuration.number_of_sectors 							= g_calibration_config[8];
+//		// 9
+//		g_joint_configuration.zero_electric_position 					= (int16_t) g_calibration_config[12];
+//		g_joint_configuration.zero_electric_rotation 					= g_calibration_config[13];
 
-		g_joint_configuration.can_node_id 										= g_calibration_config[16];
-		if (g_joint_configuration.can_node_id == 255)
-		{
-			g_joint_configuration.can_node_id 									= 0;
-		}
-		g_joint_configuration.motor_type 											= g_calibration_config[17];
+//		g_joint_configuration.can_node_id 										= g_calibration_config[16];
+//		if (g_joint_configuration.can_node_id == 255)
+//		{
+//			g_joint_configuration.can_node_id 									= 0;
+//		}
+//		g_joint_configuration.motor_type 											= g_calibration_config[17];
 
-		// Read calibration table from FLASH
-		//	for (int i = 0; i <= g_joint_configuration.calibration_table_size / 2 + 1; i++) {
-		for (int i = 0; i <= g_joint_configuration.calibration_table_size; i++) {
-			Flash_Read_Data (g_flash_address_calibration_table + i * 8, (uint32_t *) g_data, 1);
-			g_joint_configuration.calibration_table_1[i]				= g_data[0] >> 16;
-			g_joint_configuration.calibration_table_2[i] 				= g_data[0];
-		}
+//		// Read calibration table from FLASH
+//		//	for (int i = 0; i <= g_joint_configuration.calibration_table_size / 2 + 1; i++) {
+//		for (int i = 0; i <= g_joint_configuration.calibration_table_size; i++) {
+//			Flash_Read_Data (g_flash_address_calibration_table + i * 8, (uint32_t *) g_data, 1);
+//			g_joint_configuration.calibration_table_1[i]				= g_data[0] >> 16;
+//			g_joint_configuration.calibration_table_2[i] 				= g_data[0];
+//		}
 
-		g_joint_configuration.maximum_electrical_rotations = g_joint_configuration.gear_ratio * g_joint_configuration.pole_pairs;
+//		g_joint_configuration.maximum_electrical_rotations = g_joint_configuration.gear_ratio * g_joint_configuration.pole_pairs;
 
-		g_joint_configuration.electric_rotation_width 				= M_TWOPI / (g_joint_configuration.pole_pairs * g_joint_configuration.gear_ratio); // szerokosc jednego obrotu elektrycznego silnika w stosunku do szerokosci obrotu jointa (2PI)
-		g_joint_configuration.calibration_state 							= JOINT_CALIBRATED;
+//		g_joint_configuration.electric_rotation_width 				= M_TWOPI / (g_joint_configuration.pole_pairs * g_joint_configuration.gear_ratio); // szerokosc jednego obrotu elektrycznego silnika w stosunku do szerokosci obrotu jointa (2PI)
+//		g_joint_configuration.calibration_state 							= JOINT_CALIBRATED;
 
-	}
-#endif
+//	}
+//#endif
 
 #ifdef ENCODER_PZ2656
 	Flash_Read_Data(g_flash_address_configuration, (uint32_t *) g_registers_flash, 64 * 2);
@@ -1203,213 +1203,213 @@ void FSM_Tick_Callback()
 	// FSM
 	switch (FSM_Get_State()) {
 
-#ifdef ENCODER_MA730
-		
-		case FSM_TRANSITION_INIT_TO_CALIBRATION_PHASE_0:
-			FSM_Activate_State(FSM_CALIBRATION_PHASE_0);
-			break;
-		
-		case FSM_CALIBRATION_PHASE_0:
-			g_joint_configuration.absolute_encoder_enabled = true;
-			g_joint_configuration.motor_type = RI70;
-			g_joint_configuration.calibration_state = JOINT_NOT_CALIBRATED;
+//#ifdef ENCODER_MA730
+//		
+//		case FSM_TRANSITION_INIT_TO_CALIBRATION_PHASE_0:
+//			FSM_Activate_State(FSM_CALIBRATION_PHASE_0);
+//			break;
+//		
+//		case FSM_CALIBRATION_PHASE_0:
+//			g_joint_configuration.absolute_encoder_enabled = true;
+//			g_joint_configuration.motor_type = RI70;
+//			g_joint_configuration.calibration_state = JOINT_NOT_CALIBRATED;
 
-			g_current_sector_number = -1;
-			g_previous_sector_number = -1;
+//			g_current_sector_number = -1;
+//			g_previous_sector_number = -1;
 
-//				if (g_joint_configuration.ma730_enabled == false)
+////				if (g_joint_configuration.ma730_enabled == false)
+////				{
+////					FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE);
+////					break;
+////				}
+
+//			g_joint_configuration.calibration_sector_size = SECTOR_SIZE;
+//			g_joint_configuration.pole_pairs = POLE_PAIRS;
+//			g_joint_configuration.gear_ratio = GEAR_RATIO;
+//			g_joint_configuration.maximum_electrical_rotations = g_joint_configuration.gear_ratio * g_joint_configuration.pole_pairs;
+//			g_joint_configuration.calibration_table_size = (uint16_t) (g_joint_configuration.maximum_electrical_rotations / g_joint_configuration.calibration_sector_size);
+
+//			g_joint_configuration.reachable_electrical_rotations = 0;
+//			g_joint_configuration.number_of_sectors = 0;
+//			g_joint_configuration.zero_electric_position = 0;
+//			g_joint_configuration.zero_electric_rotation = 0;
+//			for (int i = 0; i < g_joint_configuration.calibration_table_size; i++)
+//			{
+//				g_joint_configuration.calibration_table_1[i] = 0;
+//				g_joint_configuration.calibration_table_2[i] = 0;
+//			}
+//			FSM_Activate_State(FSM_CALIBRATION_PHASE_1);
+//			break;
+
+//		case FSM_CALIBRATION_PHASE_1:
+//			if (motor_reach_torque_limit()) // REACH MINIMUM EDGE
+//			{
+//				motor_stop();
+////					g_joint_status.mc_current_electric_rotation = 0; // zeroing electric rotation counter
+//				g_current_electrical_rotation = 0;
+//				g_min_encoder_position = g_joint_status.mc_current_motor_position_multiturn; // encoder value
+
+//				FSM_Activate_State(FSM_CALIBRATION_PHASE_2);
+
+//			}
+//			else
+//			{
+//				motor_start(SPEED_MODE, -1 * g_calibration_speed);
+//			}
+//			break;
+
+//		case FSM_CALIBRATION_PHASE_2:
+//		{
+//			uint16_t sector_number = g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size;
+////				uint16_t sector_number = g_joint_status.mc_current_electric_rotation;
+
+//			if ((g_joint_status.mc_current_electric_rotation % g_joint_configuration.calibration_sector_size == 0) &&
+//				(g_joint_configuration.calibration_table_1[sector_number] == 0) &&
+//				(abs(g_joint_status.mc_current_electric_position) < 2048))
+//			{
+//				g_joint_configuration.calibration_table_1[sector_number] = g_ma730.angle;
+////					g_joint_configuration.calibration_table_1[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
+
+//			}
+
+//			if (motor_reach_torque_limit()) // REACH MAXIMUM EDGE
+//			{
+//				motor_stop();
+//				g_joint_configuration.calibration_table_2[sector_number] = g_ma730.angle;
+////					g_joint_configuration.calibration_table_2[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
+//				g_max_electric_rotation_cw 	= g_joint_status.mc_current_electric_rotation; // max electric rotation counter
+
+//				g_max_encoder_position = g_joint_status.mc_current_motor_position_multiturn; // max encoder value
+//				FSM_Activate_State(FSM_CALIBRATION_PHASE_3);
+
+//			}
+//			else
+//			{
+//				motor_start(SPEED_MODE, g_calibration_speed);
+//			}
+//			break;
+//		}
+//		case FSM_CALIBRATION_PHASE_3:
+//		{
+//			uint16_t sector_number = g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size;
+////				int16_t sector_number = g_joint_status.mc_current_electric_rotation;
+
+//			if (g_joint_status.mc_current_electric_rotation < 0)
+//			{
+//				break;
+//			}
+
+//			if ((g_joint_status.mc_current_electric_rotation % g_joint_configuration.calibration_sector_size == g_joint_configuration.calibration_sector_size - 1) &&
+//				(g_joint_configuration.calibration_table_2[sector_number] == 0) &&
+//				(abs(g_joint_status.mc_current_electric_position) < 2048))
+//			{
+//				g_joint_configuration.calibration_table_2[sector_number] = g_ma730.angle;
+////					g_joint_configuration.calibration_table_2[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
+//			}
+
+//			if (motor_reach_torque_limit()) // REACH MINIMUM EDGE
+//			{
+//				motor_stop();
+//				g_joint_configuration.calibration_table_1[sector_number] = g_ma730.angle;
+
+//				if (g_joint_configuration.calibration_table_2[0] == 0 && g_joint_configuration.calibration_table_2[1] > 0) // center of 0 sector is not reached
 //				{
-//					FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE);
-//					break;
+//					g_joint_configuration.calibration_table_2[0] = g_ma730.angle;
 //				}
 
-			g_joint_configuration.calibration_sector_size = SECTOR_SIZE;
-			g_joint_configuration.pole_pairs = POLE_PAIRS;
-			g_joint_configuration.gear_ratio = GEAR_RATIO;
-			g_joint_configuration.maximum_electrical_rotations = g_joint_configuration.gear_ratio * g_joint_configuration.pole_pairs;
-			g_joint_configuration.calibration_table_size = (uint16_t) (g_joint_configuration.maximum_electrical_rotations / g_joint_configuration.calibration_sector_size);
+////					g_joint_configuration.calibration_table_1[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
+//				FSM_Activate_State(FSM_CALIBRATION_PHASE_4);
 
-			g_joint_configuration.reachable_electrical_rotations = 0;
-			g_joint_configuration.number_of_sectors = 0;
-			g_joint_configuration.zero_electric_position = 0;
-			g_joint_configuration.zero_electric_rotation = 0;
-			for (int i = 0; i < g_joint_configuration.calibration_table_size; i++)
-			{
-				g_joint_configuration.calibration_table_1[i] = 0;
-				g_joint_configuration.calibration_table_2[i] = 0;
-			}
-			FSM_Activate_State(FSM_CALIBRATION_PHASE_1);
-			break;
+//			}
+//			else
+//			{
+//				motor_start(SPEED_MODE, -1 * g_calibration_speed);
+//			}
+//			break;
+//		}
+//		
+//		case FSM_CALIBRATION_PHASE_4:
+//			// Sprawdzenie tablicy kalibracyjnej
+//			if (!check_calibration_data_cw(g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size) ||
+//				!check_calibration_data_ccw(g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size))
+//			{
+//				FSM_Activate_State(FSM_CALIBRATION_PHASE_2);
+//				g_calibration_state = CALIBRATION_TABLE_CONTAINS_ZEROES;
+//			}
+//			else
+//			{
+//				g_max_electric_rotation_ccw = g_joint_status.mc_current_electric_rotation; // Should be 0 right now
+//				g_center_encoder_position = (g_max_encoder_position - g_min_encoder_position + 1) / 2 + g_min_encoder_position;
 
-		case FSM_CALIBRATION_PHASE_1:
-			if (motor_reach_torque_limit()) // REACH MINIMUM EDGE
-			{
-				motor_stop();
-//					g_joint_status.mc_current_electric_rotation = 0; // zeroing electric rotation counter
-				g_current_electrical_rotation = 0;
-				g_min_encoder_position = g_joint_status.mc_current_motor_position_multiturn; // encoder value
+//				g_joint_configuration.number_of_sectors = (uint16_t) (g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size);
+//				g_joint_configuration.reachable_electrical_rotations = g_max_electric_rotation_cw;
+//				g_calibration_state = CALIBRATION_OK;
+//				FSM_Activate_State(FSM_CALIBRATION_PHASE_5);
+//			}
+//			break;
 
-				FSM_Activate_State(FSM_CALIBRATION_PHASE_2);
+//		case FSM_CALIBRATION_PHASE_5:
+//			if (motor_in_position(g_center_encoder_position))
+//			{
+//				FSM_Activate_State(FSM_CALIBRATION_PHASE_6);
+//				motor_start(SPEED_MODE, 0);
+//				motor_stop();
 
-			}
-			else
-			{
-				motor_start(SPEED_MODE, -1 * g_calibration_speed);
-			}
-			break;
+//				g_joint_configuration.zero_electric_rotation = g_joint_status.mc_current_electric_rotation;
+////					g_joint_configuration.zero_electric_position = (uint16_t) (g_motor_status.current_electric_position);
+//				g_joint_configuration.zero_electric_position = (int16_t) (g_joint_status.mc_current_electric_position);
 
-		case FSM_CALIBRATION_PHASE_2:
-		{
-			uint16_t sector_number = g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size;
-//				uint16_t sector_number = g_joint_status.mc_current_electric_rotation;
+//				// Correct calibration table
+////					for (int i = 1; i <= g_joint_configuration.number_of_sectors; i++)
+////					{
+////						if (g_joint_configuration.calibration_table_1[i] < g_joint_configuration.calibration_table_2[i - 1])
+////						{
+////							uint16_t temp = g_joint_configuration.calibration_table_1[i];
+////							g_joint_configuration.calibration_table_1[i] = g_joint_configuration.calibration_table_2[i - 1];
+////							g_joint_configuration.calibration_table_2[i - 1] = temp;
+////
+////						}
+////
+////						if (g_joint_configuration.calibration_table_1[i] == g_joint_configuration.calibration_table_2[i - 1])
+////						{
+////							g_joint_configuration.calibration_table_2[i - 1] -= 1;
+////							g_joint_configuration.calibration_table_1[i] 	 += 1;
+////						}
+////					}
+//			}
+//			else
+//			{
+//				motor_start(SPEED_MODE, g_calibration_speed);
+//			}
 
-			if ((g_joint_status.mc_current_electric_rotation % g_joint_configuration.calibration_sector_size == 0) &&
-				(g_joint_configuration.calibration_table_1[sector_number] == 0) &&
-				(abs(g_joint_status.mc_current_electric_position) < 2048))
-			{
-				g_joint_configuration.calibration_table_1[sector_number] = g_ma730.angle;
-//					g_joint_configuration.calibration_table_1[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
+//			if (motor_reach_torque_limit()) // REACH EDGE - FAILURE
+//			{
+//				motor_start(SPEED_MODE, 0);
+//				motor_stop();
+//				g_calibration_state = MISSED_CENTER_POSITION;
+////						g_fsm_status.state = FSM_STOPPED_WITH_ERRORS;
+//				FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE);
 
-			}
+//			}
+//			break;
+//		
+//		case FSM_CALIBRATION_PHASE_6:
+//			HAL_TIM_Base_Stop_IT(&htim6); // Disable 10 kHz timer
 
-			if (motor_reach_torque_limit()) // REACH MAXIMUM EDGE
-			{
-				motor_stop();
-				g_joint_configuration.calibration_table_2[sector_number] = g_ma730.angle;
-//					g_joint_configuration.calibration_table_2[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
-				g_max_electric_rotation_cw 	= g_joint_status.mc_current_electric_rotation; // max electric rotation counter
+//			if (FLASH_Configuration_Save() == 0)
+//			{
+//				g_joint_configuration.calibration_state = JOINT_CALIBRATED;
+//				FDCAN_Set_Filters();
+//				FSM_Activate_State(FSM_INIT); // CALIBRATION FINISHED - GO TO INIT STATE
+//			}
+//			else
+//			{
+//				FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE); // CALIBRATION FINISHED - GO TO INIT STATE
+//			}
 
-				g_max_encoder_position = g_joint_status.mc_current_motor_position_multiturn; // max encoder value
-				FSM_Activate_State(FSM_CALIBRATION_PHASE_3);
-
-			}
-			else
-			{
-				motor_start(SPEED_MODE, g_calibration_speed);
-			}
-			break;
-		}
-		case FSM_CALIBRATION_PHASE_3:
-		{
-			uint16_t sector_number = g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size;
-//				int16_t sector_number = g_joint_status.mc_current_electric_rotation;
-
-			if (g_joint_status.mc_current_electric_rotation < 0)
-			{
-				break;
-			}
-
-			if ((g_joint_status.mc_current_electric_rotation % g_joint_configuration.calibration_sector_size == g_joint_configuration.calibration_sector_size - 1) &&
-				(g_joint_configuration.calibration_table_2[sector_number] == 0) &&
-				(abs(g_joint_status.mc_current_electric_position) < 2048))
-			{
-				g_joint_configuration.calibration_table_2[sector_number] = g_ma730.angle;
-//					g_joint_configuration.calibration_table_2[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
-			}
-
-			if (motor_reach_torque_limit()) // REACH MINIMUM EDGE
-			{
-				motor_stop();
-				g_joint_configuration.calibration_table_1[sector_number] = g_ma730.angle;
-
-				if (g_joint_configuration.calibration_table_2[0] == 0 && g_joint_configuration.calibration_table_2[1] > 0) // center of 0 sector is not reached
-				{
-					g_joint_configuration.calibration_table_2[0] = g_ma730.angle;
-				}
-
-//					g_joint_configuration.calibration_table_1[g_joint_status.mc_current_electric_rotation / g_joint_configuration.calibration_sector_size] = g_joint_status.mc_current_electric_rotation;
-				FSM_Activate_State(FSM_CALIBRATION_PHASE_4);
-
-			}
-			else
-			{
-				motor_start(SPEED_MODE, -1 * g_calibration_speed);
-			}
-			break;
-		}
-		
-		case FSM_CALIBRATION_PHASE_4:
-			// Sprawdzenie tablicy kalibracyjnej
-			if (!check_calibration_data_cw(g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size) ||
-				!check_calibration_data_ccw(g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size))
-			{
-				FSM_Activate_State(FSM_CALIBRATION_PHASE_2);
-				g_calibration_state = CALIBRATION_TABLE_CONTAINS_ZEROES;
-			}
-			else
-			{
-				g_max_electric_rotation_ccw = g_joint_status.mc_current_electric_rotation; // Should be 0 right now
-				g_center_encoder_position = (g_max_encoder_position - g_min_encoder_position + 1) / 2 + g_min_encoder_position;
-
-				g_joint_configuration.number_of_sectors = (uint16_t) (g_max_electric_rotation_cw / g_joint_configuration.calibration_sector_size);
-				g_joint_configuration.reachable_electrical_rotations = g_max_electric_rotation_cw;
-				g_calibration_state = CALIBRATION_OK;
-				FSM_Activate_State(FSM_CALIBRATION_PHASE_5);
-			}
-			break;
-
-		case FSM_CALIBRATION_PHASE_5:
-			if (motor_in_position(g_center_encoder_position))
-			{
-				FSM_Activate_State(FSM_CALIBRATION_PHASE_6);
-				motor_start(SPEED_MODE, 0);
-				motor_stop();
-
-				g_joint_configuration.zero_electric_rotation = g_joint_status.mc_current_electric_rotation;
-//					g_joint_configuration.zero_electric_position = (uint16_t) (g_motor_status.current_electric_position);
-				g_joint_configuration.zero_electric_position = (int16_t) (g_joint_status.mc_current_electric_position);
-
-				// Correct calibration table
-//					for (int i = 1; i <= g_joint_configuration.number_of_sectors; i++)
-//					{
-//						if (g_joint_configuration.calibration_table_1[i] < g_joint_configuration.calibration_table_2[i - 1])
-//						{
-//							uint16_t temp = g_joint_configuration.calibration_table_1[i];
-//							g_joint_configuration.calibration_table_1[i] = g_joint_configuration.calibration_table_2[i - 1];
-//							g_joint_configuration.calibration_table_2[i - 1] = temp;
-//
-//						}
-//
-//						if (g_joint_configuration.calibration_table_1[i] == g_joint_configuration.calibration_table_2[i - 1])
-//						{
-//							g_joint_configuration.calibration_table_2[i - 1] -= 1;
-//							g_joint_configuration.calibration_table_1[i] 	 += 1;
-//						}
-//					}
-			}
-			else
-			{
-				motor_start(SPEED_MODE, g_calibration_speed);
-			}
-
-			if (motor_reach_torque_limit()) // REACH EDGE - FAILURE
-			{
-				motor_start(SPEED_MODE, 0);
-				motor_stop();
-				g_calibration_state = MISSED_CENTER_POSITION;
-//						g_fsm_status.state = FSM_STOPPED_WITH_ERRORS;
-				FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE);
-
-			}
-			break;
-		
-		case FSM_CALIBRATION_PHASE_6:
-			HAL_TIM_Base_Stop_IT(&htim6); // Disable 10 kHz timer
-
-			if (FLASH_Configuration_Save() == 0)
-			{
-				g_joint_configuration.calibration_state = JOINT_CALIBRATED;
-				FDCAN_Set_Filters();
-				FSM_Activate_State(FSM_INIT); // CALIBRATION FINISHED - GO TO INIT STATE
-			}
-			else
-			{
-				FSM_Activate_State(FSM_FAULT_REACTION_ACTIVE); // CALIBRATION FINISHED - GO TO INIT STATE
-			}
-
-			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
-			break;
-#endif
+//			HAL_TIM_Base_Start_IT(&htim6); // Enable 10 kHz timer
+//			break;
+//#endif
 
 #ifdef ENCODER_PZ2656
 		// ADJUSTMENT DIGITAL
@@ -1920,24 +1920,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 #ifdef ENCODER_PZ2656
 		if (g_joint_configuration.absolute_encoder_enabled == true)
 		{
+			if (REG_Get_uint16(0x22) != 0)
+			{
+				g_joint_configuration.calibration_state = JOINT_CALIBRATED;
+			}
 //			if (!g_pz2656.started) {
 //				g_pz2656.started = true;
-				bufsize = 6;
-				buf_tx[0] = 0xA6;
+			bufsize = 6;
+			buf_tx[0] = 0xA6;
 
-				for (uint16_t i = 1; i < bufsize; i++) {
-					buf_tx[i] = 0x00;
-				}
+			for (uint16_t i = 1; i < bufsize; i++) {
+				buf_tx[i] = 0x00;
+			}
 
-				HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
-				//HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
-				HAL_SPI_TransmitReceive(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize, 1);
-				HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
-				
-				uint16_t readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
-				REG_Set(0xD8, (uint16_t *) &readings);
-				g_pz2656.readings = REG_Get_uint16(0xD8);
-				//g_pz2656.readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
+			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_RESET);
+			//HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize);
+			HAL_SPI_TransmitReceive(&hspi1, (uint8_t *) &buf_tx, (uint8_t *) &buf_rx, bufsize, 1);
+			HAL_GPIO_WritePin(ABSOLUTE_ENCODER_CS_GPIO_Port, ABSOLUTE_ENCODER_CS_Pin, GPIO_PIN_SET);
+			
+			uint16_t readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
+			REG_Set(0xD8, (uint16_t *) &readings);
+			g_pz2656.readings = REG_Get_uint16(0xD8);
+			//g_pz2656.readings = ((uint16_t) buf_rx[1] << 8 | (uint16_t) buf_rx[2]);
 
 			//}
 
@@ -2179,7 +2183,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					int16_t goal;
 					goal  = can_rx_data[offset] << 8;
 					goal += can_rx_data[offset + 1];
-
+					
 					switch (g_joint_command.working_mode)
 					{
 						case TORQUE_MODE:
@@ -2215,7 +2219,6 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					// -------------------------------------------------------------------------------------------------
 					// Recalculate data from MC to Floats
 					Update_Data_From_MC();
-
 					// -------------------------------------------------------------------------------------------------
 					// Recalculate data from floats to CAN
 					int32_t l_joint_position_in_s32degree = (int32_t) (g_joint_status.f_current_joint_position_from_absolute_encoder * ( (float) UINT32_MAX / M_TWOPI));
@@ -2238,12 +2241,15 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					can_tx_data[5] 	= l_speed_in_dpp;
 					can_tx_data[6] 	= l_current_torque_in_s16a >> 8;
 					can_tx_data[7] 	= l_current_torque_in_s16a;
+
 					can_tx_data[8] 	= (uint8_t) g_joint_status.current_bearing_temperature;
 					can_tx_data[9] 	= FSM_Get_State(); // FSM
 					can_tx_data[10]	= g_joint_status.mc_current_faults_motor;
 					can_tx_data[11] = g_joint_status.mc_occured_faults_motor;
 					can_tx_data[12] = g_joint_status.errors;
 					can_tx_data[13] = g_joint_status.warnings;
+
+
 
 					// -- MA730
 //					can_tx_data[14] = g_ma730.angle >> 8;
@@ -2261,8 +2267,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					dlugosc_danych_polecenia = 1;
 					// uint8_t - FSM
 					offset = dlugosc_danych_polecenia * numer_w_szeregu;
-
 					FSM_Set_New_State(can_rx_data[offset]);
+
 					//g_fsm_status.current_state = can_rx_data[offset];
 
 					can_tx_data[0] = FSM_Get_State();
@@ -2363,6 +2369,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					
 
 					// jak sie powiedzie to 1
+					can_tx_data[0] = 1;
 
 					can_tx_header.DataLength = FDCAN_DLC_BYTES_1;
 				}
@@ -2476,26 +2483,26 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 				}
 				break;
 				
-#ifdef ENCODER_MA730
+//#ifdef ENCODER_MA730
 
-			case 0xC: // GET MA730 SECTOR VALUE
-				dlugosc_danych_polecenia = 2;
-				// uint8_t - FSM
-				offset = dlugosc_danych_polecenia * numer_w_szeregu;
+//			case 0xC: // GET MA730 SECTOR VALUE
+//				dlugosc_danych_polecenia = 2;
+//				// uint8_t - FSM
+//				offset = dlugosc_danych_polecenia * numer_w_szeregu;
 
-//				uint16_t sector_id = ((uint16_t) can_rx_data[offset]) << 8 + can_rx_data[offset + 1];
-				int16_t sector_id;
-				sector_id  = can_rx_data[offset] << 8;
-				sector_id += can_rx_data[offset + 1];
+////				uint16_t sector_id = ((uint16_t) can_rx_data[offset]) << 8 + can_rx_data[offset + 1];
+//				int16_t sector_id;
+//				sector_id  = can_rx_data[offset] << 8;
+//				sector_id += can_rx_data[offset + 1];
 
-				can_tx_data[0] 	= g_joint_configuration.calibration_table_1[sector_id] >> 8;
-				can_tx_data[1] 	= g_joint_configuration.calibration_table_1[sector_id];
-				can_tx_data[2] 	= g_joint_configuration.calibration_table_2[sector_id] >> 8;
-				can_tx_data[3] 	= g_joint_configuration.calibration_table_2[sector_id];
+//				can_tx_data[0] 	= g_joint_configuration.calibration_table_1[sector_id] >> 8;
+//				can_tx_data[1] 	= g_joint_configuration.calibration_table_1[sector_id];
+//				can_tx_data[2] 	= g_joint_configuration.calibration_table_2[sector_id] >> 8;
+//				can_tx_data[3] 	= g_joint_configuration.calibration_table_2[sector_id];
 
-				can_tx_header.DataLength = FDCAN_DLC_BYTES_4;
-				break;
-#endif
+//				can_tx_header.DataLength = FDCAN_DLC_BYTES_4;
+//				break;
+//#endif
 
 			case 0xF: // Konfiguracja
 				{
@@ -2509,6 +2516,7 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 						g_joint_configuration.absolute_encoder_enabled 				= (can_rx_data[offset + 1] & 0x02) >> 1;
 						g_joint_configuration.safety_enabled 									= (can_rx_data[offset + 1] & 0x04) >> 2;
 						g_joint_configuration.canbus_watchdog_enabled 				= (can_rx_data[offset + 1] & 0x08) >> 3;
+						g_joint_configuration.speed_limit_enabled 						= (can_rx_data[offset + 1] & 0x10) >> 4;
 						
 						can_tx_data[0] = 1;
 					}
