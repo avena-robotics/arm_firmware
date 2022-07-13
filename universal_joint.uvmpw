@@ -8,33 +8,20 @@
   <WorkspaceName>WorkSpace</WorkspaceName>
 
   <project>
-    <PathAndName>.\universal_joint_3.2_MC5Y3_RI70\MDK-ARM\universal_joint_3.2_MC5Y3_RI70.uvprojx</PathAndName>
-  </project>
-
-  <project>
-    <PathAndName>.\universal_joint_3.2_MC5Y3_RI80\MDK-ARM\universal_joint_3.2_MC5Y3_RI80.uvprojx</PathAndName>
-  </project>
-
-  <project>
-    <PathAndName>.\universal_joint_3.2_MC5Y4_RI80\MDK-ARM\universal_joint_3.2_MC5Y4_RI80.uvprojx</PathAndName>
-  </project>
-
-  <project>
     <PathAndName>.\gripper_pump\MDK-ARM\gripper_pump.uvprojx</PathAndName>
   </project>
 
   <project>
-    <PathAndName>.\SPI_TEST\MDK-ARM\SPI_TEST.uvprojx</PathAndName>
-  </project>
-
-  <project>
     <PathAndName>.\universal_joint_3.2_MC5Y3_RI70_PZ\MDK-ARM\universal_joint_3.2_MC5Y3_RI70_PZ.uvprojx</PathAndName>
-    <NodeIsActive>1</NodeIsActive>
   </project>
 
   <project>
     <PathAndName>.\universal_joint_3.2_MC5Y3_RI80_PZ\MDK-ARM\universal_joint_3.2_MC5Y3_RI80_PZ.uvprojx</PathAndName>
-    <NodeIsExpanded>1</NodeIsExpanded>
+  </project>
+
+  <project>
+    <PathAndName>.\universal_joint_3_4_MC5Y3_RI70_PZ_OCP\MDK-ARM\universal_joint_3_4_MC5Y3_RI70_PZ_OCP.uvprojx</PathAndName>
+    <NodeIsActive>1</NodeIsActive>
   </project>
 
   <project>

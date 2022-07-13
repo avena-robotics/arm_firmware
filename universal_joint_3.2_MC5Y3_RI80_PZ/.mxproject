@@ -7,8 +7,8 @@ HeaderPath=..\Drivers\STM32G4xx_HAL_Driver\Inc;..\Drivers\STM32G4xx_HAL_Driver\I
 CDefines=ARM_MATH_CM4;USE_HAL_DRIVER;STM32G431xx;USE_HAL_DRIVER;USE_HAL_DRIVER;
 
 [PreviousGenFiles]
-HeaderPath=C:/Users/lukas/Documents/arm_firmware/universal_joint_3.2_MC5Y3_RI80_PZ/Inc
+HeaderPath=C:/Users/lukasz.lecki/Documents/GitHub/arm_firmware/universal_joint_3.2_MC5Y3_RI80_PZ/Inc
 HeaderFiles=motorcontrol.h;drive_parameters.h;mc_tasks.h;mc_api.h;mc_config.h;mcp_config.h;mc_stm_types.h;regular_conversion_manager.h;mc_math.h;mc_interface.h;parameters_conversion.h;parameters_conversion_g4xx.h;pmsm_motor_parameters.h;power_stage_parameters.h;mc_parameters.h;register_interface.h;mc_configuration_registers.h;aspep.h;stm32g4xx_it.h;stm32g4xx_hal_conf.h;main.h;
-SourcePath=C:/Users/lukas/Documents/arm_firmware/universal_joint_3.2_MC5Y3_RI80_PZ/Src
+SourcePath=C:/Users/lukasz.lecki/Documents/GitHub/arm_firmware/universal_joint_3.2_MC5Y3_RI80_PZ/Src
 SourceFiles=motorcontrol.c;mc_api.c;mc_config.c;mcp_config.c;mc_tasks.c;pwm_curr_fdbk.c;regular_conversion_manager.c;mc_math.c;mc_interface.c;stm32g4xx_mc_it.c;mc_parameters.c;register_interface.c;usart_aspep_driver.c;mc_configuration_registers.c;aspep.c;stm32g4xx_it.c;stm32g4xx_hal_msp.c;main.c;
 
