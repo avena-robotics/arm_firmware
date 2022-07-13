@@ -2283,8 +2283,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan1, uint32_t RxFifo0ITs
 					// int8_t - rejestr poczatkowy
 					// int8_t - dlugosc <= 64
 					offset = dlugosc_danych_polecenia * numer_w_szeregu + 2;
-					uint8_t poczatek = can_rx_data[0]; // rejestr poczatkowy
-					uint8_t dlugosc  = can_rx_data[1] * 2; // ilosc rejestrow (16bit)
+					uint8_t poczatek = can_rx_data[offset + 0];     // rejestr poczatkowy
+					uint8_t dlugosc  = can_rx_data[offset + 1] * 2; // ilosc rejestrow (16bit)
 					uint8_t koniec   = poczatek + dlugosc;
 					
 					// dlugosc danych can - 0,1,2,3,4,5,6,7,8,12,16,20,24,32,48,64
