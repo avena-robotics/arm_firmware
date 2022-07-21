@@ -1,0 +1,5 @@
+--target=arm-arm-none-eabi -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -masm=auto -c
+-gdwarf-4
+-IC:/Users/lukasz.lecki/AppData/Local/Arm/Packs/Keil/STM32G4xx_DFP/1.5.0/Drivers/CMSIS/Device/ST/STM32G4xx/Include
+-Wa,armasm,--pd,"__UVISION_VERSION SETA 536" -Wa,armasm,--pd,"STM32G431xx SETA 1"
+-o universal_joint_3_3_mc5y3_ri80_pz/startup_stm32g431xx.o "startup_stm32g431xx.s"

@@ -72,8 +72,6 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 extern Counters_Handle_t volatile g_counters;
-uint8_t g_reg_80;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -156,8 +154,9 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
+	HAL_Delay(10);
+	MC_AcknowledgeFaultMotor1();
 	UJ_Init();
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -170,7 +169,6 @@ int main(void)
 		g_counters.main_loop++;
 		g_counters.can_tx_free_level = HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1);
 		g_counters.can_rx_fill_level = HAL_FDCAN_GetRxFifoFillLevel(&hfdcan1, FDCAN_RX_FIFO0);
-
   }
   /* USER CODE END 3 */
 }

@@ -124,11 +124,10 @@ void Error_Handler(void);
 #define BC_ENABLE_Pin GPIO_PIN_8
 #define BC_ENABLE_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
-#define KT											(float) 0.14
-#define POLE_PAIRS							(uint16_t) 7
-#define SECTOR_SIZE							(uint16_t) 7
-#define MOTOR_TYPE							RI80
-#define PCB_VERSION 						0x030400
+#define KT									(float)    0.14
+#define POLE_PAIRS					(uint16_t) 7
+#define MOTOR_TYPE					RI80
+#define PCB_VERSION 				0x0304
 
 /* USER CODE END Private defines */
 

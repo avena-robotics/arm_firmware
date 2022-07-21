@@ -1,0 +1,7 @@
+--target=arm-arm-none-eabi -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard -masm=auto -c
+-gdwarf-4
+-I./RTE/_universal_joint_3_3_MC5Y3_RI70_PZ
+-IC:/Users/lukasz.lecki/AppData/Local/Arm/Packs/ARM/CMSIS/5.9.0/CMSIS/Core/Include
+-IC:/Users/lukasz.lecki/AppData/Local/Arm/Packs/Keil/STM32G4xx_DFP/1.5.0/Drivers/CMSIS/Device/ST/STM32G4xx/Include
+-Wa,armasm,--pd,"__UVISION_VERSION SETA 536" -Wa,armasm,--pd,"_RTE_ SETA 1" -Wa,armasm,--pd,"STM32G431xx SETA 1" -Wa,armasm,--pd,"_RTE_ SETA 1"
+-o universal_joint_3_3_mc5y3_ri70_pz/startup_stm32g431xx.o "startup_stm32g431xx.s"

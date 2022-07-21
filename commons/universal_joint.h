@@ -9,16 +9,18 @@ extern "C" {
 #include <main.h>
 #include "math.h"
 
+#define APP_VERSION_MAIN   (0x1) /*!< [31:24] main version */
+#define APP_VERSION_SUB1   (0x0) /*!< [23:16] sub1 version */
+#define APP_VERSION_SUB2   (0x0) /*!< [15:8]  sub2 version */
+#define APP_VERSION_RC     (0x0) /*!< [7:0]  release candidate */
+#define APP_VERSION        ((APP_VERSION_MAIN << 24U)|(APP_VERSION_SUB1 << 16U)|(APP_VERSION_SUB2 << 8U )|(APP_VERSION_RC))
+
 #if SDK_VERSION >= 0x055a0000
 #include "mc_configuration_registers.h"
 #endif
 
-
 #define GEAR_RATIO												(uint16_t) 121
 #define JOINT_SPEED_LIMIT									(float) 1.8
-#define CALIBRATION_TORQUE_LIMIT					1000
-#define CALIBRATION_SPEED_LIMIT						10
-#define CALIBRATION_ZERO_POSITION_OFFSET	10
 #define MAX_READABLE_CURRENT							(float) 33.0
 #define MAX_TORQUE_THROUGH_CAN						(float) 360.0
 #define MAX_SPEED_THROUGH_CAN							(float) 2.0
@@ -38,14 +40,13 @@ typedef enum Joint_Error {
 //	JOINT_POSITION_ENCODER_FAILED = 1,
 	JOINT_MC_ERROR = 2,
 	JOINT_SPEED_TO_HIGH = 4,
-	JOINT_HW_ERROR = 8 // brak MA730, brak temp, GD fault
+	JOINT_HW_ERROR = 8 // brak temp, GD fault
 } Joint_Error_t;
 
 typedef enum Joint_Warning {
 	JOINT_NO_WARNING = 0,
 	JOINT_POSITION_NOT_ACCURATE = 1,
 	JOINT_OUTSIDE_WORKING_AREA = 2,
-	JOINT_MA730_NOT_PROPER_MAGNETOC_FIELD = 4,
 	JOINT_SAFETY = 8,	
 } Joint_Warning_t;
 
@@ -79,24 +80,6 @@ typedef enum Motor {
 	RI80
 } Motor_t;
 
-typedef struct MA730_Handle {
-	bool started;
-	uint16_t angle;
-	uint8_t z0;
-	uint8_t z1;
-	uint8_t bct;
-	uint8_t ety;
-	uint8_t etx;
-	uint8_t ppt0;
-	uint8_t ppt1;
-	uint8_t ilip;
-	uint8_t mglt;
-	uint8_t mght;
-	uint8_t rd;
-	uint8_t mgh;
-	uint8_t mgl;
-} __attribute__ ((packed)) MA730_Handle_t;
-
 typedef struct PZ2656_Handle {
 	bool started;
 	uint16_t angle;
@@ -123,8 +106,6 @@ typedef struct PZ2656_Handle {
 	uint16_t reg_ecc_phase;
 
 	bool 		reg_spi_ext;
-//	uint32_t reg_st_pre;
-//	uint32_t reg_st_off;
 
 	uint32_t diag;
 } PZ2656_Handle_t;
@@ -158,23 +139,6 @@ typedef struct Joint_Configuration_Handle {
 	float joint_working_area;
 
 	Joint_Calibratation_State_t calibration_state;
-
-#ifdef ENCODER_MA730
-	uint8_t pole_pairs;
-
-	float electric_rotation_width;
-
-	uint16_t maximum_electrical_rotations;
-	uint16_t reachable_electrical_rotations;
-
-	uint16_t number_of_sectors;
-	int16_t  zero_electric_position;
-	uint16_t zero_electric_rotation;
-	uint16_t calibration_sector_size; // in electrical rotations
-	uint16_t calibration_table_size;
-	uint16_t calibration_table_1[122];
-	uint16_t calibration_table_2[122];
-#endif
 } __attribute__ ((packed)) Joint_Configuration_Handle_t;
 
 typedef struct Joint_Command_Handle {
@@ -235,7 +199,7 @@ typedef struct Joint_Status_Handle {
 
 	bool b_safety_input; // 1 - no error, 0 - error
 
-#if PCB_VERSION >= 0x030000
+#if PCB_VERSION >= 0x0300
 	bool gd_nfault;
 	bool gd_ready;
 #endif
@@ -262,25 +226,6 @@ typedef struct Joint_Status_Handle {
 } __attribute__ ((packed)) Joint_Status_Handle_t;
 
 
-//enum FSM_State {
-
-#define FSM_CALIBRATION_PHASE_0 																		100
-#define FSM_CALIBRATION_PHASE_1 																		101
-#define FSM_CALIBRATION_PHASE_2 																		102
-#define FSM_CALIBRATION_PHASE_3  																		103
-#define FSM_CALIBRATION_PHASE_4  																		104
-#define FSM_CALIBRATION_PHASE_5  																		105
-#define FSM_CALIBRATION_PHASE_6  																		106
-
-#define FSM_TRANSITION_INIT_TO_CALIBRATION_PHASE_0  								110
-#define FSM_TRANSITION_CALIBRATION_PHASE_0_TO_CALIBRATION_PHASE_1		111
-#define FSM_TRANSITION_CALIBRATION_PHASE_1_TO_CALIBRATION_PHASE_2  	112
-#define FSM_TRANSITION_CALIBRATION_PHASE_2_TO_CALIBRATION_PHASE_3  	113
-#define FSM_TRANSITION_CALIBRATION_PHASE_3_TO_CALIBRATION_PHASE_4  	114
-#define FSM_TRANSITION_CALIBRATION_PHASE_4_TO_CALIBRATION_PHASE_5  	115
-#define FSM_TRANSITION_CALIBRATION_PHASE_5_TO_CALIBRATION_PHASE_6  	116
-#define FSM_TRANSITION_CALIBRATION_PHASE_6_TO_INIT  								117
-
 #define FSM_CALIBRATION_PZ_PHASE_1_STEP_1 													131
 #define FSM_CALIBRATION_PZ_PHASE_1_STEP_2 													132
 #define FSM_CALIBRATION_PZ_PHASE_1_STEP_3 													133
@@ -305,7 +250,31 @@ typedef struct Joint_Status_Handle {
 
 #define FSM_CALIBRATION_PZ_FINISH 																	171
 #define FSM_CALIBRATION_PZ_STORE_CONFIGURATION											172
-//} FSM_State_t;
+
+// RO NON VOLATILE
+#define REG_NV_RO_PCB_VERSION						0x03
+#define REG_NV_RO_APP_VERSION						0x04
+#define REG_NV_RO_MOTOR_TYPE						0x06
+#define REG_NV_RO_GEAR_RATIO						0x07
+
+// RW NON VOLATILE
+#define REG_NV_RW_CAN_ID								0x40
+#define REG_NV_RW_REVERT_DIRECTION			0x57
+#define REG_NV_RW_PZ_OFFSET							0x58
+#define REG_NV_RW_PID_ID_KP_GAIN				0x58
+#define REG_NV_RW_PID_ID_KI_GAIN				0x59
+#define REG_NV_RW_PID_ID_KP_DIV_POW2		0x5A
+#define REG_NV_RW_PID_ID_KI_DIV_POW2		0x5B
+#define REG_NV_RW_PID_IQ_KP_GAIN				0x5C
+#define REG_NV_RW_PID_IQ_KI_GAIN				0x5D
+#define REG_NV_RW_PID_IQ_KP_DIV_POW2		0x5E
+#define REG_NV_RW_PID_IQ_KI_DIV_POW2		0x5F
+#define REG_NV_RW_FRICTION_PARAMETER_1	0x60
+#define REG_NV_RW_FRICTION_PARAMETER_2	0x62
+#define REG_NV_RW_FRICTION_PARAMETER_3	0x64
+#define REG_NV_RW_FRICTION_PARAMETER_4	0x66
+#define REG_NV_RW_FRICTION_PARAMETER_5	0x67
+#define REG_NV_RW_FRICTION_PARAMETER_6	0x6A
 
 // FUNCTION DEFINITION
 void UJ_Init(void);
@@ -315,9 +284,7 @@ void Read_MC_Encoder_1kHz(void);
 void Update_Data_From_MC(void);
 void Read_MC_State(void);
 void CheckErrorsAndWarnings();
-#ifdef ENCODER_MA730
-int16_t get_sector_number_from_calibration(uint16_t left_index, uint16_t right_index, uint16_t ma730_value, uint16_t offset, uint16_t count);
-#endif
+
 
 // EXTERN VARIABLES
 extern volatile int16_t g_current_electrical_rotation;
@@ -330,7 +297,7 @@ extern uint16_t g_safety_task;
 extern TIM_HandleTypeDef htim6;
 extern TIM_HandleTypeDef htim7;
 extern FDCAN_HandleTypeDef hfdcan1;
-#if PCB_VERSION >= 0x030000
+#if PCB_VERSION >= 0x0300
 extern SPI_HandleTypeDef hspi1;
 #else
 extern SPI_HandleTypeDef hspi2;

@@ -415,21 +415,21 @@
 							</items>
 						</var>
 						<var version="1.0" type="MC_Int" name="Torque&amp;Flux - Cut-off frequency" enable="true" visible="true" readonly="false" value="600" />
-						<var version="1.0" type="MC_Bool" name="Torque&amp;Flux - Manual editing enabled" enable="true" visible="true" readonly="false" value="true" />
-						<var version="1.0" type="MC_Int" name="Torque - P dividend" enable="true" visible="true" readonly="false" value="2425" />
-						<var version="1.0" type="MC_Int" name="Torque - P divisor" enable="true" visible="true" readonly="false" value="8192" />
-						<var version="1.0" type="MC_Int" name="Torque - I dividend" enable="true" visible="true" readonly="false" value="4000" />
-						<var version="1.0" type="MC_Int" name="Torque - I divisor" enable="true" visible="true" readonly="false" value="16384" />
+						<var version="1.0" type="MC_Bool" name="Torque&amp;Flux - Manual editing enabled" enable="true" visible="true" readonly="false" value="false" />
+						<var version="1.0" type="MC_Int" name="Torque - P dividend" enable="false" visible="true" readonly="false" value="2425" />
+						<var version="1.0" type="MC_Int" name="Torque - P divisor" enable="false" visible="true" readonly="false" value="8192" />
+						<var version="1.0" type="MC_Int" name="Torque - I dividend" enable="false" visible="true" readonly="false" value="350" />
+						<var version="1.0" type="MC_Int" name="Torque - I divisor" enable="false" visible="true" readonly="false" value="16384" />
 						<var version="1.0" type="MC_Bool" name="Torque - Enable differential term" enable="false" visible="true" readonly="false" value="false" />
 						<var version="1.0" type="MC_Int" name="Torque - D dividend" enable="false" visible="true" readonly="false" value="100" />
-						<var version="1.0" type="MC_Int" name="Torque - D divisor" enable="true" visible="true" readonly="true" value="8192" />
-						<var version="1.0" type="MC_Int" name="Flux - P dividend" enable="true" visible="true" readonly="false" value="2425" />
-						<var version="1.0" type="MC_Int" name="Flux - P divisor" enable="true" visible="true" readonly="false" value="8192" />
-						<var version="1.0" type="MC_Int" name="Flux - I dividend" enable="true" visible="true" readonly="false" value="350" />
-						<var version="1.0" type="MC_Int" name="Flux - I divisor" enable="true" visible="true" readonly="false" value="16384" />
+						<var version="1.0" type="MC_Int" name="Torque - D divisor" enable="false" visible="true" readonly="true" value="8192" />
+						<var version="1.0" type="MC_Int" name="Flux - P dividend" enable="false" visible="true" readonly="false" value="2425" />
+						<var version="1.0" type="MC_Int" name="Flux - P divisor" enable="false" visible="true" readonly="false" value="8192" />
+						<var version="1.0" type="MC_Int" name="Flux - I dividend" enable="false" visible="true" readonly="false" value="350" />
+						<var version="1.0" type="MC_Int" name="Flux - I divisor" enable="false" visible="true" readonly="false" value="16384" />
 						<var version="1.0" type="MC_Bool" name="Flux - Enable differential term" enable="false" visible="true" readonly="false" value="false" />
 						<var version="1.0" type="MC_Int" name="Flux - D dividend" enable="false" visible="true" readonly="false" value="100" />
-						<var version="1.0" type="MC_Int" name="Flux - D divisor" enable="true" visible="true" readonly="true" value="8192" />
+						<var version="1.0" type="MC_Int" name="Flux - D divisor" enable="false" visible="true" readonly="true" value="8192" />
 						<var version="1.0" type="MC_Bool" name="SpeedCtrl_Manual_editing" enable="true" visible="true" readonly="false" value="false" />
 						<var version="1.0" type="MC_Double" name="SpeedCtrl - Execution rate" enable="true" visible="true" readonly="false" value="1" />
 						<var version="1.0" type="MC_Int" name="SpeedCtrl - P dividend" enable="true" visible="true" readonly="false" value="2342" />

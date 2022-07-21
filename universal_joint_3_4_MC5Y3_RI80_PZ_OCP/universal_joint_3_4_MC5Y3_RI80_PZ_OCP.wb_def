@@ -133,8 +133,8 @@
 		<define key="HIGH_SIDE_IDLE_STATE" value="TURN_OFF" />
 		<define key="LOW_SIDE_IDLE_STATE" value="TURN_ON" />
 		<define key="REGULATION_EXECUTION_RATE" value="3" />
-		<define key="PID_TORQUE_KP_DEFAULT" value="4000" />
-		<define key="PID_TORQUE_KI_DEFAULT" value="8000" />
+		<define key="PID_TORQUE_KP_DEFAULT" value="2443" />
+		<define key="PID_TORQUE_KI_DEFAULT" value="231" />
 		<define key="PID_TORQUE_KD_DEFAULT" value="100" />
 		<define key="PID_FLUX_KP_DEFAULT" value="2443" />
 		<define key="PID_FLUX_KI_DEFAULT" value="231" />
